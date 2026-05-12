@@ -72,6 +72,12 @@ interface ApiCartItem {
   readonly imageUrl?: string;
 }
 
+interface ApiCart {
+  readonly id?: string;
+  readonly country?: string;
+  readonly currency?: string;
+}
+
 interface ApiOrder {
   readonly id?: string;
   readonly status?: string;
@@ -88,6 +94,7 @@ interface ApiPayment {
 }
 
 interface CartSnapshotResponse {
+  readonly cart?: ApiCart;
   readonly items?: ReadonlyArray<ApiCartItem>;
 }
 
@@ -279,10 +286,13 @@ function splitFullName(fullName: string | undefined): { firstName?: string; last
 export interface CommerceContextValue {
   readonly ready: boolean;
   readonly cart: ReadonlyArray<CommerceCartItem>;
+  readonly cartCountry: string | undefined;
+  readonly cartCurrency: string | undefined;
   readonly wishlist: ReadonlyArray<CommerceWishlistItem>;
   readonly cartCount: number;
   readonly cartSubtotal: number;
   refreshCart(): Promise<void>;
+  setCartCountry(country: string): Promise<void>;
   addToCart(product: CommerceCatalogProduct, quantity?: number): Promise<void>;
   removeFromCart(itemId: string): Promise<void>;
   setCartQuantity(itemId: string, quantity: number): Promise<void>;
@@ -304,11 +314,35 @@ export interface CommerceProviderProps {
 export function CommerceProvider(props: CommerceProviderProps) {
   const [ready, setReady] = useState(false);
   const [cart, setCart] = useState<ReadonlyArray<CommerceCartItem>>([]);
+  const [cartCountry, setCartCountryState] = useState<string | undefined>();
+  const [cartCurrency, setCartCurrencyState] = useState<string | undefined>();
   const [wishlist, setWishlist] = useState<ReadonlyArray<CommerceWishlistItem>>([]);
 
   const refreshCart = useCallback(async () => {
     const response = await requestJson<CartSnapshotResponse>("/api/commerce/cart");
     setCart(normalizeCartItems(response.items));
+    setCartCountryState(typeof response.cart?.country === "string" ? response.cart.country.toUpperCase() : undefined);
+    setCartCurrencyState(typeof response.cart?.currency === "string" ? response.cart.currency.toUpperCase() : undefined);
+  }, []);
+
+  const setCartCountry = useCallback(async (country: string) => {
+    const normalizedCountry = country.trim().toUpperCase();
+    if (normalizedCountry.length !== 2) {
+      return;
+    }
+
+    const response = await requestJson<CartSnapshotResponse>("/api/commerce/cart", {
+      method: "PATCH",
+      body: JSON.stringify({
+        data: {
+          country: normalizedCountry,
+        },
+      }),
+    });
+
+    setCart(normalizeCartItems(response.items));
+    setCartCountryState(typeof response.cart?.country === "string" ? response.cart.country.toUpperCase() : normalizedCountry);
+    setCartCurrencyState(typeof response.cart?.currency === "string" ? response.cart.currency.toUpperCase() : undefined);
   }, []);
 
   useEffect(() => {
@@ -351,6 +385,8 @@ export function CommerceProvider(props: CommerceProviderProps) {
     });
 
     setCart(normalizeCartItems(snapshot.items));
+    setCartCountryState(typeof snapshot.cart?.country === "string" ? snapshot.cart.country.toUpperCase() : undefined);
+    setCartCurrencyState(typeof snapshot.cart?.currency === "string" ? snapshot.cart.currency.toUpperCase() : undefined);
   }, []);
 
   const removeFromCart = useCallback(async (itemId: string) => {
@@ -358,6 +394,8 @@ export function CommerceProvider(props: CommerceProviderProps) {
       method: "DELETE",
     });
     setCart(normalizeCartItems(snapshot.items));
+    setCartCountryState(typeof snapshot.cart?.country === "string" ? snapshot.cart.country.toUpperCase() : undefined);
+    setCartCurrencyState(typeof snapshot.cart?.currency === "string" ? snapshot.cart.currency.toUpperCase() : undefined);
   }, []);
 
   const setCartQuantity = useCallback(async (itemId: string, quantity: number) => {
@@ -368,6 +406,8 @@ export function CommerceProvider(props: CommerceProviderProps) {
       }),
     });
     setCart(normalizeCartItems(snapshot.items));
+    setCartCountryState(typeof snapshot.cart?.country === "string" ? snapshot.cart.country.toUpperCase() : undefined);
+    setCartCurrencyState(typeof snapshot.cart?.currency === "string" ? snapshot.cart.currency.toUpperCase() : undefined);
   }, []);
 
   const clearCart = useCallback(async () => {
@@ -450,10 +490,13 @@ export function CommerceProvider(props: CommerceProviderProps) {
   const value = useMemo<CommerceContextValue>(() => ({
     ready,
     cart,
+    cartCountry,
+    cartCurrency,
     wishlist,
     cartCount,
     cartSubtotal,
     refreshCart,
+    setCartCountry,
     addToCart,
     removeFromCart,
     setCartQuantity,
@@ -467,10 +510,13 @@ export function CommerceProvider(props: CommerceProviderProps) {
   }), [
     ready,
     cart,
+    cartCountry,
+    cartCurrency,
     wishlist,
     cartCount,
     cartSubtotal,
     refreshCart,
+    setCartCountry,
     addToCart,
     removeFromCart,
     setCartQuantity,

@@ -10,8 +10,9 @@ import {
 } from "@/lib/ominity/server/auth";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { jsonError } from "@/lib/ominity/server/http";
+import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 
-export async function POST(): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
   const config = getStarterOminityConfig();
   const cookieStore = await cookies();
   const session = await readAuthSessionCookie(cookieStore);
@@ -35,10 +36,12 @@ export async function POST(): Promise<Response> {
   }
 
   try {
+    const language = await resolveRequestSdkLanguage(request);
     const token = await requestRefreshToken({
       refreshToken: session.refreshToken,
+      ...(typeof language === "string" ? { language } : {}),
     });
-    const user = await loadUserFromAccessToken(token.accessToken);
+    const user = await loadUserFromAccessToken(token.accessToken, language);
     const refreshed = createAuthSession(token, user);
     await writeAuthSessionCookie(cookieStore, refreshed);
 

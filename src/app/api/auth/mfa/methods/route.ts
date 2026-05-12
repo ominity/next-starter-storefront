@@ -8,8 +8,9 @@ import {
 } from "@/lib/ominity/server/auth";
 import { jsonError } from "@/lib/ominity/server/http";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
+import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const config = getStarterOminityConfig();
   const cookieStore = await cookies();
   const session = await readAuthSessionCookie(cookieStore);
@@ -28,7 +29,8 @@ export async function GET(): Promise<Response> {
   }
 
   try {
-    const user = await loadUserFromAccessToken(session.accessToken);
+    const language = await resolveRequestSdkLanguage(request);
+    const user = await loadUserFromAccessToken(session.accessToken, language);
     const userId = typeof user?.id === "number" ? user.id : session.userId;
     if (!userId) {
       return jsonError(400, "MISSING_USER_ID", "Current session does not include a user id.");
@@ -37,6 +39,7 @@ export async function GET(): Promise<Response> {
     const methods = await listUserMfaMethods({
       accessToken: session.accessToken,
       userId,
+      ...(typeof language === "string" ? { language } : {}),
     });
 
     return Response.json({

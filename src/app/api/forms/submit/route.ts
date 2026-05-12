@@ -8,7 +8,6 @@ const config = getStarterOminityConfig();
 const formSubmitHandler = createOminityFormSubmitHandler({
   ominityApiKey: config.apiKey ?? "missing-api-key",
   ...(config.apiUrl ? { ominityBaseUrl: config.apiUrl } : {}),
-  ...(config.formsRecaptchaSecret ? { recaptchaSecret: config.formsRecaptchaSecret } : {}),
   ...(config.useMockData
     ? {
       forwardSubmission: async ({ payload }: { payload: unknown }) => ({

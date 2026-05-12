@@ -1,6 +1,7 @@
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { sendPasswordResetLink } from "@/lib/ominity/server/auth";
 import { isRecord, jsonError, parseJsonBody } from "@/lib/ominity/server/http";
+import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 
 export async function POST(request: Request): Promise<Response> {
   let payload: unknown;
@@ -32,11 +33,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
+    const language = await resolveRequestSdkLanguage(request);
     const userAgent = request.headers.get("user-agent");
     const ipAddress = request.headers.get("x-forwarded-for");
     const result = await sendPasswordResetLink({
       email,
       redirectUrl,
+      ...(typeof language === "string" ? { language } : {}),
       ...(typeof userAgent === "string" ? { userAgent } : {}),
       ...(typeof ipAddress === "string" ? { ipAddress } : {}),
     });

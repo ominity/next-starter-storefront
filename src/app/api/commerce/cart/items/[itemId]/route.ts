@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { getOrCreateCartSnapshot } from "@/lib/ominity/server/commerce";
 import { isRecord, jsonError, parseJsonBody } from "@/lib/ominity/server/http";
+import { resolveRequestCountry, resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import {
   mockDeleteCartItem,
   mockGetOrCreateCart,
@@ -83,8 +84,11 @@ export async function PATCH(request: Request, context: CartItemRouteProps): Prom
   }
 
   try {
-    const snapshot = await getOrCreateCartSnapshot(cookieStore);
-    const sdk = createApiKeySdk();
+    const language = await resolveRequestSdkLanguage(request);
+    const country = await resolveRequestCountry(request);
+    const createCartData = country ? { country } : {};
+    const snapshot = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
+    const sdk = createApiKeySdk(language);
 
     if (quantity !== null) {
       if (quantity <= 0) {
@@ -96,7 +100,7 @@ export async function PATCH(request: Request, context: CartItemRouteProps): Prom
       await sdk.commerce.cartItems.update(snapshot.cart.id, itemId, payload.data as Record<string, any>);
     }
 
-    const refreshed = await getOrCreateCartSnapshot(cookieStore);
+    const refreshed = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
     return Response.json(refreshed);
   } catch (error) {
     return jsonError(500, "CART_ITEM_UPDATE_FAILED", "Failed to update cart item.", {
@@ -105,7 +109,7 @@ export async function PATCH(request: Request, context: CartItemRouteProps): Prom
   }
 }
 
-export async function DELETE(_: Request, context: CartItemRouteProps): Promise<Response> {
+export async function DELETE(request: Request, context: CartItemRouteProps): Promise<Response> {
   const { itemId } = await context.params;
   if (!itemId || itemId.trim().length === 0) {
     return jsonError(400, "INVALID_ITEM_ID", "A valid cart item id is required.");
@@ -136,10 +140,13 @@ export async function DELETE(_: Request, context: CartItemRouteProps): Promise<R
   }
 
   try {
-    const snapshot = await getOrCreateCartSnapshot(cookieStore);
-    const sdk = createApiKeySdk();
+    const language = await resolveRequestSdkLanguage(request);
+    const country = await resolveRequestCountry(request);
+    const createCartData = country ? { country } : {};
+    const snapshot = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
+    const sdk = createApiKeySdk(language);
     await sdk.commerce.cartItems.delete(snapshot.cart.id, itemId);
-    const refreshed = await getOrCreateCartSnapshot(cookieStore);
+    const refreshed = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
 
     return Response.json(refreshed);
   } catch (error) {

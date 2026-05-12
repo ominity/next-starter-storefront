@@ -1,5 +1,6 @@
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { jsonError } from "@/lib/ominity/server/http";
+import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { mockListOrderPayments } from "@/lib/ominity/server/mock-commerce";
 import { normalizePayments } from "@/lib/ominity/server/normalize";
 import { createApiKeySdk } from "@/lib/ominity/server/sdk";
@@ -10,7 +11,7 @@ interface OrderPaymentsRouteProps {
   }>;
 }
 
-export async function GET(_: Request, context: OrderPaymentsRouteProps): Promise<Response> {
+export async function GET(request: Request, context: OrderPaymentsRouteProps): Promise<Response> {
   const { orderId } = await context.params;
   if (!orderId || orderId.trim().length === 0) {
     return jsonError(400, "INVALID_ORDER_ID", "A valid order id is required.");
@@ -25,7 +26,8 @@ export async function GET(_: Request, context: OrderPaymentsRouteProps): Promise
   }
 
   try {
-    const sdk = createApiKeySdk();
+    const language = await resolveRequestSdkLanguage(request);
+    const sdk = createApiKeySdk(language);
     const payments = await sdk.commerce.orders.listPayments(orderId);
 
     return Response.json({

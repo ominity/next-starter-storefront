@@ -7,6 +7,7 @@ import {
   writeAuthSessionCookie,
 } from "@/lib/ominity/server/auth";
 import { jsonError, parseJsonBody, isRecord } from "@/lib/ominity/server/http";
+import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 
 export async function POST(request: Request): Promise<Response> {
@@ -51,12 +52,14 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
+    const language = await resolveRequestSdkLanguage(request);
     const token = await requestPasswordGrantToken({
       username: email,
       password,
+      ...(typeof language === "string" ? { language } : {}),
     });
 
-    const user = await loadUserFromAccessToken(token.accessToken);
+    const user = await loadUserFromAccessToken(token.accessToken, language);
     const session = createAuthSession(token, user);
     await writeAuthSessionCookie(cookieStore, session);
 

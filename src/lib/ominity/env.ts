@@ -4,6 +4,7 @@ import type {
   CmsLocaleSegmentStrategy,
   StringLinkStrategy,
 } from "@ominity/next/cms";
+import type { HomeLocaleRedirectMode as StarterHomeLocaleRedirectMode } from "@ominity/next/next";
 
 const DEFAULT_LOCALES: ReadonlyArray<CmsLocale> = [
   { code: "en", language: "en", label: "English", default: true },
@@ -84,11 +85,27 @@ const toStringLinkStrategy = (value: string | undefined): StringLinkStrategy => 
   return "localize-relative";
 };
 
+const toHomeLocaleRedirectMode = (
+  value: string | undefined,
+): StarterHomeLocaleRedirectMode => {
+  if (
+    value === "off"
+    || value === "accept-language"
+    || value === "cookie-accept-language"
+    || value === "geo-cookie-accept-language"
+  ) {
+    return value;
+  }
+
+  return "off";
+};
+
 export interface StarterOminityConfig {
   readonly nodeEnv: string;
   readonly siteUrl: string;
   readonly useMockData: boolean;
   readonly debugLogs: boolean;
+  readonly debugBar: boolean;
   readonly strictMissingComponents: boolean;
   readonly apiUrl?: string;
   readonly apiKey?: string;
@@ -98,12 +115,13 @@ export interface StarterOminityConfig {
   readonly localeSegmentStrategy: CmsLocaleSegmentStrategy;
   readonly canonicalRedirectPolicy: CmsCanonicalRedirectPolicy;
   readonly stringLinkStrategy: StringLinkStrategy;
+  readonly homeLocaleRedirectMode: StarterHomeLocaleRedirectMode;
+  readonly homeLocaleRedirectCookieName: string;
+  readonly homeLocaleRedirectSkipBots: boolean;
   readonly trailingSlash: boolean;
   readonly basePath: string;
   readonly revalidateSeconds: number;
   readonly draftToken?: string;
-  readonly formsRecaptchaSiteKey?: string;
-  readonly formsRecaptchaSecret?: string;
   readonly formsValidateFormId: boolean;
   readonly enableCommerce: boolean;
   readonly enableCommerceProducts: boolean;
@@ -160,6 +178,7 @@ export const getStarterOminityConfig = (): StarterOminityConfig => {
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
     useMockData: toBoolean(process.env.OMINITY_USE_MOCK_DATA, true),
     debugLogs: toBoolean(process.env.OMINITY_DEBUG_LOGS, false),
+    debugBar: toBoolean(process.env.OMINITY_DEBUG_BAR, (process.env.NODE_ENV ?? "development") !== "production"),
     strictMissingComponents: toBoolean(process.env.OMINITY_STRICT_COMPONENTS, true),
     ...(typeof process.env.OMINITY_API_URL === "string"
       ? { apiUrl: process.env.OMINITY_API_URL }
@@ -175,6 +194,9 @@ export const getStarterOminityConfig = (): StarterOminityConfig => {
     localeSegmentStrategy: toLocaleStrategy(process.env.OMINITY_LOCALE_SEGMENT_STRATEGY),
     canonicalRedirectPolicy: toCanonicalPolicy(process.env.OMINITY_CANONICAL_REDIRECT_POLICY),
     stringLinkStrategy: toStringLinkStrategy(process.env.OMINITY_STRING_LINK_STRATEGY),
+    homeLocaleRedirectMode: toHomeLocaleRedirectMode(process.env.OMINITY_HOME_LOCALE_REDIRECT_MODE),
+    homeLocaleRedirectCookieName: toNonEmptyString(process.env.OMINITY_HOME_LOCALE_REDIRECT_COOKIE_NAME) ?? "ominity_locale",
+    homeLocaleRedirectSkipBots: toBoolean(process.env.OMINITY_HOME_LOCALE_REDIRECT_SKIP_BOTS, true),
     trailingSlash: toBoolean(process.env.OMINITY_TRAILING_SLASH, false),
     basePath: process.env.OMINITY_BASE_PATH ?? "",
     revalidateSeconds: toNumber(
@@ -183,12 +205,6 @@ export const getStarterOminityConfig = (): StarterOminityConfig => {
     ),
     ...(typeof process.env.OMINITY_DRAFT_TOKEN === "string"
       ? { draftToken: process.env.OMINITY_DRAFT_TOKEN }
-      : {}),
-    ...(typeof process.env.NEXT_PUBLIC_OMINITY_FORMS_RECAPTCHA_SITE_KEY === "string"
-      ? { formsRecaptchaSiteKey: process.env.NEXT_PUBLIC_OMINITY_FORMS_RECAPTCHA_SITE_KEY }
-      : {}),
-    ...(typeof process.env.OMINITY_FORMS_RECAPTCHA_SECRET === "string"
-      ? { formsRecaptchaSecret: process.env.OMINITY_FORMS_RECAPTCHA_SECRET }
       : {}),
     formsValidateFormId: toBoolean(process.env.OMINITY_FORMS_VALIDATE_FORM_ID, true),
     enableCommerce,

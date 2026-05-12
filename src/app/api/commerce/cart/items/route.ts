@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { getOrCreateCartSnapshot } from "@/lib/ominity/server/commerce";
 import { isRecord, jsonError, parseJsonBody } from "@/lib/ominity/server/http";
+import { resolveRequestCountry, resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { mockAddCartItem, mockGetOrCreateCart } from "@/lib/ominity/server/mock-commerce";
 import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
@@ -71,10 +72,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const snapshot = await getOrCreateCartSnapshot(cookieStore);
-    const sdk = createApiKeySdk();
+    const language = await resolveRequestSdkLanguage(request);
+    const country = await resolveRequestCountry(request);
+    const createCartData = country ? { country } : {};
+    const snapshot = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
+    const sdk = createApiKeySdk(language);
     await sdk.commerce.cartItems.create(snapshot.cart.id, productId, quantity);
-    const refreshed = await getOrCreateCartSnapshot(cookieStore);
+    const refreshed = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
 
     return Response.json(refreshed);
   } catch (error) {

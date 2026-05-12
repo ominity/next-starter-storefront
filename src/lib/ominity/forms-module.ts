@@ -25,7 +25,6 @@ export const verifyOminityFormExists = async (
       filter: {
         id: input.formId,
       },
-      include: ["form_fields"],
     });
 
     return response.items.length > 0;

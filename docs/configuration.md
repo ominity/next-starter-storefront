@@ -55,9 +55,10 @@ All runtime config is centralized in `src/lib/ominity/env.ts`.
 
 | Variable | Purpose |
 |---|---|
-| `NEXT_PUBLIC_OMINITY_FORMS_RECAPTCHA_SITE_KEY` | Client site key for reCAPTCHA |
-| `OMINITY_FORMS_RECAPTCHA_SECRET` | Server secret for verification |
 | `OMINITY_FORMS_VALIDATE_FORM_ID` | Validate submitted `formId` with `@ominity/api-module-forms` |
+
+reCAPTCHA settings are configured in Ominity CMS and exposed through form field options.  
+Secrets stay backend-only (Formspree-style) and should not be configured in the starter app.
 
 ## Commerce feature flags
 

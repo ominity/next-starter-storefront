@@ -59,7 +59,7 @@ See [`docs/architecture.md`](docs/architecture.md).
 
 Core flow:
 
-1. `app/[[...slug]]/page.tsx` resolves route params
+1. `app/(pages)/[...segment]/page.tsx` resolves route params
 2. `@ominity/next` routing resolves locale + canonical behavior
 3. CMS page is fetched from configured data source (`mock` or `live`)
 4. Generic renderer renders through project-owned registry
@@ -81,7 +81,8 @@ See [`docs/auth.md`](docs/auth.md).
 
 The starter includes separate route modules:
 
-- `src/app/[[...slug]]` for CMS pages
+- `src/app/page.tsx` for `/` root behavior (optional locale-aware redirect + CMS homepage fallback)
+- `src/app/(pages)/[...segment]` for CMS pages
 - `src/app/(commerce)` for commerce pages
 - `src/app/(auth)` for auth/account pages
 
@@ -99,6 +100,23 @@ Starter APIs:
 
 - `/api/auth/*` for login/register/session/refresh/MFA/password flows
 - `/api/commerce/*` for cart items, checkout, shipping/payment methods, orders
+
+### Local JSON translations
+
+- Local UI copy can be stored in JSON dictionaries under `src/locales/ui/*.json`.
+- The starter includes English and Dutch dictionaries and uses them in the site header.
+- The header locale switcher component (`src/components/site/locale-switcher.tsx`) is channel-aware and supports:
+  - language mode (`OMINITY_LOCALE_SEGMENT_STRATEGY=language`)
+  - country-language mode (`OMINITY_LOCALE_SEGMENT_STRATEGY=country-language`)
+- The switcher keeps a locale cookie (`ominity_locale`) to align API request language.
+- Server SDK calls now resolve language from request locale context (header/cookie/referrer path) and pass it as the SDK `language` option.
+- Optional home auto-redirect is available for `/`:
+  - `OMINITY_HOME_LOCALE_REDIRECT_MODE=off | accept-language | cookie-accept-language | geo-cookie-accept-language`
+  - `OMINITY_HOME_LOCALE_REDIRECT_SKIP_BOTS=true` (recommended for SEO-safe behavior)
+- Cart creation auto-resolves `country` from:
+  1. locale country segment (when using `country-language`)
+  2. request country detection headers / `Accept-Language`
+  3. channel default country fallback
 
 ### Excluding modules per project
 

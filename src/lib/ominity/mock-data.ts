@@ -552,7 +552,17 @@ export const MOCK_CHANNEL: CmsChannel = {
       code: "BE",
       name: "Belgium",
       language: "nl",
+      currency: "EUR",
       enabled: true,
+      default: true,
+    },
+  ],
+  currencies: [
+    {
+      code: "EUR",
+      name: "Euro",
+      symbol: "€",
+      default: true,
     },
   ],
 };

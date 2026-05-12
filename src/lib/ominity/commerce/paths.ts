@@ -4,6 +4,7 @@ import { cmsLocalizedStringLinkResolver } from "@/lib/ominity/routing";
 
 export type CommerceUtilityRoute =
   | "home"
+  | "products"
   | "cart"
   | "wishlist"
   | "checkout"
@@ -11,6 +12,7 @@ export type CommerceUtilityRoute =
 
 const COMMERCE_ROUTE_SEGMENTS: Readonly<Record<CommerceUtilityRoute, string>> = {
   home: "/",
+  products: "/products",
   cart: "/cart",
   wishlist: "/wishlist",
   checkout: "/checkout",
@@ -19,6 +21,7 @@ const COMMERCE_ROUTE_SEGMENTS: Readonly<Record<CommerceUtilityRoute, string>> = 
 
 export interface CommerceUtilityPaths {
   readonly home: string;
+  readonly products: string;
   readonly cart: string;
   readonly wishlist: string;
   readonly checkout: string;
@@ -36,6 +39,7 @@ export function buildCommerceUtilityPath(route: CommerceUtilityRoute, locale: st
 export function buildCommerceUtilityPaths(locale: string): CommerceUtilityPaths {
   return {
     home: buildCommerceUtilityPath("home", locale),
+    products: buildCommerceUtilityPath("products", locale),
     cart: buildCommerceUtilityPath("cart", locale),
     wishlist: buildCommerceUtilityPath("wishlist", locale),
     checkout: buildCommerceUtilityPath("checkout", locale),

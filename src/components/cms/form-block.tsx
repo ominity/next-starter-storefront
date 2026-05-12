@@ -1,4 +1,4 @@
-import type { CmsComponentRenderProps } from "@ominity/next/rendering";
+import type { CmsComponentRenderProps } from "@ominity/next/cms/rendering";
 
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { StarterRenderContext } from "@/lib/ominity/types";

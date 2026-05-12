@@ -1,5 +1,5 @@
 import type { CmsLinkTarget } from "@ominity/next/cms";
-import type { CmsComponentRenderProps } from "@ominity/next/rendering";
+import type { CmsComponentRenderProps } from "@ominity/next/cms/rendering";
 import type { Route } from "next";
 import Link from "next/link";
 

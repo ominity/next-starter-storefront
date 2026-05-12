@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import {
   FormRenderer,
@@ -30,21 +30,6 @@ interface FormBlockClientProps {
 export function FormBlockClient({ form, locale, title, description }: FormBlockClientProps) {
   const [submitted, setSubmitted] = useState(false);
 
-  const recaptcha = useMemo(() => {
-    const siteKey = process.env.NEXT_PUBLIC_OMINITY_FORMS_RECAPTCHA_SITE_KEY;
-    if (!siteKey) {
-      return undefined;
-    }
-
-    return {
-      version: "v3" as const,
-      siteKey,
-      action: "form_submit",
-    };
-  }, []);
-
-  const recaptchaProps = recaptcha ? { recaptcha } : {};
-
   return (
     <Card>
       <CardHeader>
@@ -65,7 +50,6 @@ export function FormBlockClient({ form, locale, title, description }: FormBlockC
           styled
           themeOverride={tailwindDefaultTheme}
           components={shadcnFormComponents}
-          {...recaptchaProps}
           onSubmitSuccess={() => {
             setSubmitted(true);
           }}
@@ -77,4 +61,3 @@ export function FormBlockClient({ form, locale, title, description }: FormBlockC
     </Card>
   );
 }
-

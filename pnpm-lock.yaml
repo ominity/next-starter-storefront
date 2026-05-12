@@ -9,14 +9,14 @@ importers:
   .:
     dependencies:
       '@ominity/api-module-forms':
-        specifier: ^1.0.0
-        version: 1.0.0(@ominity/api-typescript@1.1.1)
+        specifier: ^1.0.1
+        version: 1.0.1(@ominity/api-typescript@1.1.4)
       '@ominity/api-typescript':
-        specifier: ^1.1.1
-        version: 1.1.1
+        specifier: ^1.1.4
+        version: 1.1.4
       '@ominity/next':
-        specifier: ^1.0.2
-        version: 1.0.2(@ominity/api-typescript@1.1.1)(next@16.2.3(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react-hook-form@7.72.1(react@19.2.5))(react@19.2.5)
+        specifier: ^1.1.5
+        version: 1.1.5(@ominity/api-typescript@1.1.4)(next@16.2.3(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react-hook-form@7.72.1(react@19.2.5))(react@19.2.5)
       '@radix-ui/react-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -53,6 +53,9 @@ importers:
       tailwind-merge:
         specifier: ^3.3.1
         version: 3.5.0
+      vaul:
+        specifier: ^1.1.2
+        version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.1.7
@@ -467,16 +470,16 @@ packages:
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
 
-  '@ominity/api-module-forms@1.0.0':
-    resolution: {integrity: sha512-Da/fCeZsRyPhppLVykuGxHhIVvXoB5mCtKffwNbTdz/4kFIgWgvbvH1+cw4j/3l/bfI0Ukg9ZR+HB6oCPdi3uA==}
+  '@ominity/api-module-forms@1.0.1':
+    resolution: {integrity: sha512-0Niz26M9eVG4mpRS9dMpBIqIXSGPsQGif6/90LqMVLpIMEKeCQFStoaAuKGD9WtyMwKDLH0SpjFmDYyrakSRHw==}
     peerDependencies:
       '@ominity/api-typescript': ^0.0.2
 
-  '@ominity/api-typescript@1.1.1':
-    resolution: {integrity: sha512-EB+LbQL6j36CJO9Uyb5y75/XsH4V6itBLQWhFVp+UlCJWatY1IWpkgPB82hiXtrc7bFlTaouKxV7f/e/32iJAg==}
+  '@ominity/api-typescript@1.1.4':
+    resolution: {integrity: sha512-Jl9tHKVckbAR0+bTpBEWGbq53j743v0nReg0iaGnOZ42lcv/h8YtGwTP1/u8Y4MSGgUy8N46a7Yt9oCRD7VA/A==}
 
-  '@ominity/next@1.0.2':
-    resolution: {integrity: sha512-93uuZlNl9sxen9z6OW45B5Ag5ARsVqOlIkpqhx9kHY6Bh0/TA2wipnvCceppqY71CNM0sSsjVSXd8RkKxrS8Bw==}
+  '@ominity/next@1.1.5':
+    resolution: {integrity: sha512-ZfDgzEmLknLGuAoLUorbSLoJCZP1ATM7J711O2BrlEoRsHlqbSkKRSqI2e/jixV/nl4kOobrLM5sdXYDdv1LKg==}
     peerDependencies:
       '@ominity/api-typescript': ^1.1.1
       next: ^15.0.0 || ^16.0.0
@@ -2309,6 +2312,12 @@ packages:
       '@types/react':
         optional: true
 
+  vaul@1.1.2:
+    resolution: {integrity: sha512-ZFkClGpWyI2WUQjdLJ/BaGuV6AVQiJ3uELGk3OYtP+B6yCO7Cmn9vPFXVJkRaGkOJu3m8bQMgtyzNHixULceQA==}
+    peerDependencies:
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
+      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
+
   which-boxed-primitive@1.1.1:
     resolution: {integrity: sha512-TbX3mj8n0odCBFVlY8AxkqcHASw3L60jIuF8jFP78az3C2YhmGvqbHBpAjTRH2/xqYunrJ9g1jSyjCjpoWzIAA==}
     engines: {node: '>= 0.4'}
@@ -2349,6 +2358,9 @@ packages:
 
   zod@4.3.6:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
 
@@ -2694,18 +2706,18 @@ snapshots:
 
   '@nolyfill/is-core-module@1.0.39': {}
 
-  '@ominity/api-module-forms@1.0.0(@ominity/api-typescript@1.1.1)':
+  '@ominity/api-module-forms@1.0.1(@ominity/api-typescript@1.1.4)':
     dependencies:
-      '@ominity/api-typescript': 1.1.1
-      zod: 4.3.6
+      '@ominity/api-typescript': 1.1.4
+      zod: 4.4.3
 
-  '@ominity/api-typescript@1.1.1':
+  '@ominity/api-typescript@1.1.4':
     dependencies:
-      zod: 4.3.6
+      zod: 4.4.3
 
-  '@ominity/next@1.0.2(@ominity/api-typescript@1.1.1)(next@16.2.3(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react-hook-form@7.72.1(react@19.2.5))(react@19.2.5)':
+  '@ominity/next@1.1.5(@ominity/api-typescript@1.1.4)(next@16.2.3(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react-hook-form@7.72.1(react@19.2.5))(react@19.2.5)':
     dependencies:
-      '@ominity/api-typescript': 1.1.1
+      '@ominity/api-typescript': 1.1.4
       next: 16.2.3(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
@@ -4703,6 +4715,15 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.14
 
+  vaul@1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+    dependencies:
+      '@radix-ui/react-dialog': 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      react: 19.2.5
+      react-dom: 19.2.5(react@19.2.5)
+    transitivePeerDependencies:
+      - '@types/react'
+      - '@types/react-dom'
+
   which-boxed-primitive@1.1.1:
     dependencies:
       is-bigint: 1.1.0
@@ -4759,3 +4780,5 @@ snapshots:
       zod: 4.3.6
 
   zod@4.3.6: {}
+
+  zod@4.4.3: {}

@@ -7,6 +7,7 @@ import type {
   CmsPage,
   CmsRoute,
 } from "@ominity/next/cms";
+import { normalizeLocaleCode, parseLocaleCode } from "@ominity/next/cms";
 
 import { getLiveCmsClient } from "./cms-client";
 import { getStarterOminityConfig } from "./env";
@@ -24,8 +25,15 @@ export const getCmsClient = (): CmsClient => {
 export const getCmsPageByPath = async (
   input: CmsGetPageByPathInput,
 ): Promise<CmsPage | null> => {
+  const locale = typeof input.locale === "string"
+    ? parseLocaleCode(normalizeLocaleCode(input.locale)).language
+    : undefined;
+
   try {
-    return await getCmsClient().getPageByPath(input);
+    return await getCmsClient().getPageByPath({
+      ...input,
+      ...(typeof locale === "string" && locale.length > 0 ? { locale } : {}),
+    });
   } catch {
     return null;
   }
@@ -34,8 +42,15 @@ export const getCmsPageByPath = async (
 export const getCmsRoutes = async (
   input?: CmsGetRoutesInput,
 ): Promise<ReadonlyArray<CmsRoute>> => {
+  const locale = typeof input?.locale === "string"
+    ? parseLocaleCode(normalizeLocaleCode(input.locale)).language
+    : undefined;
+
   try {
-    return await getCmsClient().getRoutes(input);
+    return await getCmsClient().getRoutes({
+      ...input,
+      ...(typeof locale === "string" && locale.length > 0 ? { locale } : {}),
+    });
   } catch {
     return [];
   }
@@ -44,8 +59,15 @@ export const getCmsRoutes = async (
 export const getCmsMenus = async (
   input?: CmsGetMenusInput,
 ): Promise<ReadonlyArray<CmsMenu>> => {
+  const locale = typeof input?.locale === "string"
+    ? parseLocaleCode(normalizeLocaleCode(input.locale)).language
+    : undefined;
+
   try {
-    return await getCmsClient().getMenus(input);
+    return await getCmsClient().getMenus({
+      ...input,
+      ...(typeof locale === "string" && locale.length > 0 ? { locale } : {}),
+    });
   } catch {
     return [];
   }

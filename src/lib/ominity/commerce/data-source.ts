@@ -17,7 +17,7 @@ import type {
   StarterResolvedCommerceProduct,
 } from "./types";
 
-let liveCommerceSdk: Ominity | null = null;
+const liveCommerceSdkByLanguage = new Map<string, Ominity>();
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -274,27 +274,43 @@ function normalizeLiveCategory(input: unknown): StarterCommerceCategoryRecord | 
   };
 }
 
-function getLiveCommerceSdk(): Ominity | null {
+function languageFromLocale(locale: string | undefined): string | undefined {
+  if (typeof locale !== "string" || locale.length === 0) {
+    return undefined;
+  }
+
+  const parsed = parseLocaleCode(normalizeLocaleCode(locale));
+  return parsed.language.length > 0 ? parsed.language : undefined;
+}
+
+function getLiveCommerceSdk(language?: string): Ominity | null {
   const config = getStarterOminityConfig();
   if (!config.apiUrl || !config.apiKey) {
     return null;
   }
 
-  if (!liveCommerceSdk) {
-    liveCommerceSdk = new Ominity({
-      serverURL: config.apiUrl,
-      security: {
-        apiKey: config.apiKey,
-      },
-      ...(typeof config.channelId === "string" ? { channelId: config.channelId } : {}),
-    });
+  const sdkLanguage = typeof language === "string" && language.length > 0 ? language : "";
+  const cacheKey = sdkLanguage || "__default__";
+  const cached = liveCommerceSdkByLanguage.get(cacheKey);
+  if (cached) {
+    return cached;
   }
 
-  return liveCommerceSdk;
+  const sdk = new Ominity({
+    serverURL: config.apiUrl,
+    security: {
+      apiKey: config.apiKey,
+    },
+    ...(typeof config.channelId === "string" ? { channelId: config.channelId } : {}),
+    ...(sdkLanguage ? { language: sdkLanguage } : {}),
+  });
+
+  liveCommerceSdkByLanguage.set(cacheKey, sdk);
+  return sdk;
 }
 
-async function listLiveProducts(): Promise<ReadonlyArray<StarterCommerceProductRecord>> {
-  const sdk = getLiveCommerceSdk();
+async function listLiveProducts(language?: string): Promise<ReadonlyArray<StarterCommerceProductRecord>> {
+  const sdk = getLiveCommerceSdk(language);
   if (!sdk) {
     return [];
   }
@@ -314,8 +330,8 @@ async function listLiveProducts(): Promise<ReadonlyArray<StarterCommerceProductR
   }
 }
 
-async function listLiveCategories(): Promise<ReadonlyArray<StarterCommerceCategoryRecord>> {
-  const sdk = getLiveCommerceSdk();
+async function listLiveCategories(language?: string): Promise<ReadonlyArray<StarterCommerceCategoryRecord>> {
+  const sdk = getLiveCommerceSdk(language);
   if (!sdk) {
     return [];
   }
@@ -335,22 +351,22 @@ async function listLiveCategories(): Promise<ReadonlyArray<StarterCommerceCatego
   }
 }
 
-export async function listCommerceProducts(): Promise<ReadonlyArray<StarterCommerceProductRecord>> {
+export async function listCommerceProducts(locale?: string): Promise<ReadonlyArray<StarterCommerceProductRecord>> {
   const config = getStarterOminityConfig();
   if (config.useMockData) {
     return MOCK_COMMERCE_PRODUCTS;
   }
 
-  return listLiveProducts();
+  return listLiveProducts(languageFromLocale(locale));
 }
 
-export async function listCommerceCategories(): Promise<ReadonlyArray<StarterCommerceCategoryRecord>> {
+export async function listCommerceCategories(locale?: string): Promise<ReadonlyArray<StarterCommerceCategoryRecord>> {
   const config = getStarterOminityConfig();
   if (config.useMockData) {
     return MOCK_COMMERCE_CATEGORIES;
   }
 
-  return listLiveCategories();
+  return listLiveCategories(languageFromLocale(locale));
 }
 
 export async function listCommerceProductRouteEntries(): Promise<ReadonlyArray<StarterCommerceProductRouteEntry>> {
@@ -417,8 +433,8 @@ export async function findCommerceProductByRouteSegment(input: {
   readonly locale: string;
   readonly routeSegment: string;
 }): Promise<StarterResolvedCommerceProduct | null> {
-  const products = await listCommerceProducts();
   const normalizedLocale = normalizeLocaleCode(input.locale);
+  const products = await listCommerceProducts(normalizedLocale);
 
   for (const product of products) {
     const route = resolveRouteForLocale(product.routes, normalizedLocale, "product");
@@ -451,8 +467,8 @@ export async function findCommerceCategoryBySlugSegments(input: {
   readonly locale: string;
   readonly slugSegments: ReadonlyArray<string>;
 }): Promise<StarterResolvedCommerceCategory | null> {
-  const categories = await listCommerceCategories();
   const normalizedLocale = normalizeLocaleCode(input.locale);
+  const categories = await listCommerceCategories(normalizedLocale);
   const normalizedInputSlug = normalizePathSegments(input.slugSegments);
 
   for (const category of categories) {
@@ -482,8 +498,8 @@ export async function listCommerceProductsForCategory(input: {
   readonly locale: string;
   readonly category: StarterResolvedCommerceCategory;
 }): Promise<ReadonlyArray<StarterResolvedCommerceProduct>> {
-  const products = await listCommerceProducts();
   const normalizedLocale = normalizeLocaleCode(input.locale);
+  const products = await listCommerceProducts(normalizedLocale);
   const categorySlug = input.category.slugSegments.join("/");
   const fallbackLanguage = parseLocaleCode(normalizedLocale).language;
   const result: StarterResolvedCommerceProduct[] = [];
@@ -523,4 +539,62 @@ export async function listCommerceProductsForCategory(input: {
   }
 
   return result;
+}
+
+export async function listResolvedCommerceProducts(locale: string): Promise<ReadonlyArray<StarterResolvedCommerceProduct>> {
+  const normalizedLocale = normalizeLocaleCode(locale);
+  const products = await listCommerceProducts(normalizedLocale);
+  const result: StarterResolvedCommerceProduct[] = [];
+
+  for (const product of products) {
+    const route = resolveRouteForLocale(product.routes, normalizedLocale, "product");
+    if (!route) {
+      continue;
+    }
+
+    const routeSegment = productRouteSegment(route);
+    if (!routeSegment) {
+      continue;
+    }
+
+    result.push({
+      record: product,
+      locale: normalizedLocale,
+      route,
+      routeSegment,
+      canonicalPath: canonicalPathForRoute(route, normalizedLocale),
+    });
+  }
+
+  return result.sort((a, b) => a.record.title.localeCompare(b.record.title, undefined, { sensitivity: "base" }));
+}
+
+export async function listResolvedCommerceCategories(
+  locale: string,
+): Promise<ReadonlyArray<StarterResolvedCommerceCategory>> {
+  const normalizedLocale = normalizeLocaleCode(locale);
+  const categories = await listCommerceCategories(normalizedLocale);
+  const result: StarterResolvedCommerceCategory[] = [];
+
+  for (const category of categories) {
+    const route = resolveRouteForLocale(category.routes, normalizedLocale, "category");
+    if (!route) {
+      continue;
+    }
+
+    const slugSegments = routePathSegments(route);
+    if (slugSegments.length === 0) {
+      continue;
+    }
+
+    result.push({
+      record: category,
+      locale: normalizedLocale,
+      route,
+      slugSegments,
+      canonicalPath: canonicalPathForRoute(route, normalizedLocale),
+    });
+  }
+
+  return result.sort((a, b) => a.record.name.localeCompare(b.record.name, undefined, { sensitivity: "base" }));
 }

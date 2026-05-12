@@ -10,7 +10,8 @@
 
 - `src/app`
   - App Router routes and route handlers
-  - catch-all CMS page entry (`[[...slug]]`)
+  - root page entry (`/page.tsx`) for `/` redirect/fallback
+  - catch-all CMS page entry (`(pages)/[...segment]`)
   - modular commerce routes (`/p/...`, `/c/...`, `/cart`, `/wishlist`, `/checkout`, `/payment`)
   - separate auth routes (`/auth/*`, `/account`)
   - auth + commerce API bridge routes (`/api/auth/*`, `/api/commerce/*`)
@@ -49,7 +50,7 @@
 
 ## Rendering model
 
-1. Next.js route receives params in `app/[[...slug]]/page.tsx`
+1. Next.js route receives params in `app/(pages)/[...segment]/page.tsx`
 2. `fetchCmsPageForParams` resolves path + locale + canonical behavior
 3. renderer maps CMS component keys to local React components via registry
 4. nested components and child trees render recursively

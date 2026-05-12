@@ -8,6 +8,7 @@ import {
 } from "@/lib/ominity/server/auth";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { jsonError, isRecord, parseJsonBody } from "@/lib/ominity/server/http";
+import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
 export async function POST(request: Request): Promise<Response> {
@@ -62,7 +63,8 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const sdk = createApiKeySdk();
+    const language = await resolveRequestSdkLanguage(request);
+    const sdk = createApiKeySdk(language);
     const user = await sdk.users.create({
       firstName,
       ...(lastName.length > 0 ? { lastName } : {}),
@@ -77,8 +79,9 @@ export async function POST(request: Request): Promise<Response> {
       const token = await requestPasswordGrantToken({
         username: email,
         password,
+        ...(typeof language === "string" ? { language } : {}),
       });
-      authedUser = await loadUserFromAccessToken(token.accessToken);
+      authedUser = await loadUserFromAccessToken(token.accessToken, language);
       session = createAuthSession(token, authedUser);
       await writeAuthSessionCookie(cookieStore, session);
     } catch {}

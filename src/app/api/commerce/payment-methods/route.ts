@@ -1,9 +1,10 @@
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { jsonError } from "@/lib/ominity/server/http";
+import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { normalizePaymentMethods } from "@/lib/ominity/server/normalize";
 import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const config = getStarterOminityConfig();
   if (config.useMockData) {
     return Response.json({
@@ -19,7 +20,8 @@ export async function GET(): Promise<Response> {
   }
 
   try {
-    const sdk = createApiKeySdk();
+    const language = await resolveRequestSdkLanguage(request);
+    const sdk = createApiKeySdk(language);
     const methods = await sdk.settings.paymentMethods.list({
       page: 1,
       limit: 100,

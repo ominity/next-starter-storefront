@@ -1,11 +1,12 @@
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import {
   normalizeCart,
-  normalizeCartItems,
+  normalizeCartItemsFromCart,
   type StarterApiCart,
   type StarterApiCartItem,
 } from "@/lib/ominity/server/normalize";
 import { createApiKeySdk } from "@/lib/ominity/server/sdk";
+import { ResponseValidationError } from "@ominity/api-typescript/models/errors";
 
 export interface StarterCookieValue {
   readonly value: string;
@@ -28,6 +29,38 @@ export interface StarterCartSnapshot {
   readonly cart: StarterApiCart;
   readonly items: ReadonlyArray<StarterApiCartItem>;
   readonly created: boolean;
+}
+
+const CART_RELATIONS_INCLUDE = "items,items.product,items.offer,shippingMethod";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function recoverCartFromValidationError(error: unknown): Record<string, unknown> | null {
+  if (!(error instanceof ResponseValidationError)) {
+    return null;
+  }
+
+  if (error.statusCode < 200 || error.statusCode >= 300) {
+    return null;
+  }
+
+  if (!isRecord(error.rawValue)) {
+    return null;
+  }
+
+  const payload = error.rawValue;
+  const resource = typeof payload.resource === "string" ? payload.resource : "";
+  const id = payload.id;
+  const hasId = (typeof id === "string" && id.length > 0)
+    || (typeof id === "number" && Number.isFinite(id));
+
+  if (resource !== "cart" || !hasId) {
+    return null;
+  }
+
+  return payload;
 }
 
 function cartIdFromCookie(cookiesStore: StarterCookieStore): string | null {
@@ -63,48 +96,91 @@ export function clearCartCookie(cookiesStore: StarterCookieStore): void {
   });
 }
 
-async function fetchCartItems(cartId: string): Promise<ReadonlyArray<StarterApiCartItem>> {
-  const sdk = createApiKeySdk();
-  const listResponse = await sdk.commerce.cartItems.list(cartId, {
-    cartId,
-    include: "product",
-    limit: 250,
+async function parseResponseBody(response: Response): Promise<unknown> {
+  if (response.status === 204) {
+    return null;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("json")) {
+    return response.json();
+  }
+
+  return response.text();
+}
+
+async function fetchCartWithRelations(
+  cartId: string,
+  language?: string,
+): Promise<Record<string, unknown> | null> {
+  const sdk = createApiKeySdk(language);
+  const response = await sdk.http.get(`/commerce/carts/${encodeURIComponent(cartId)}`, {
+    query: {
+      include: CART_RELATIONS_INCLUDE,
+    },
+    errorCodes: ["5XX"],
   });
 
-  return normalizeCartItems(listResponse);
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch cart ${cartId}: status ${response.status}.`);
+  }
+
+  const payload = await parseResponseBody(response);
+  return isRecord(payload) ? payload : null;
 }
 
 export async function getOrCreateCartSnapshot(
   cookiesStore: StarterCookieStore,
   createCartData: Readonly<Record<string, unknown>> = {},
+  language?: string,
 ): Promise<StarterCartSnapshot> {
-  const sdk = createApiKeySdk();
+  const sdk = createApiKeySdk(language);
 
   let created = false;
-  let cart = null as Awaited<ReturnType<typeof sdk.commerce.carts.get>> | null;
+  let cartPayload: Record<string, unknown> | null = null;
   const cookieCartId = cartIdFromCookie(cookiesStore);
   if (cookieCartId) {
+    cartPayload = await fetchCartWithRelations(cookieCartId, language);
+  }
+
+  if (!cartPayload) {
+    let createdCartPayload: Record<string, unknown> | null = null;
     try {
-      cart = await sdk.commerce.carts.get(cookieCartId, {
-        include: "billingAddress,shippingAddress",
-      });
-    } catch {
-      cart = null;
+      const createdCart = await sdk.commerce.carts.create(createCartData as Record<string, any>);
+      createdCartPayload = isRecord(createdCart) ? createdCart as Record<string, unknown> : null;
+    } catch (error) {
+      const recovered = recoverCartFromValidationError(error);
+      if (!recovered) {
+        throw error;
+      }
+
+      createdCartPayload = recovered;
     }
-  }
-
-  if (!cart) {
-    cart = await sdk.commerce.carts.create(createCartData as Record<string, any>);
     created = true;
+
+    if (!createdCartPayload) {
+      throw new Error("Failed to create cart.");
+    }
+
+    const createdCartId = normalizeCart(createdCartPayload).id;
+    if (createdCartId.length === 0) {
+      throw new Error("Failed to resolve created cart id.");
+    }
+
+    cartPayload = await fetchCartWithRelations(createdCartId, language) ?? createdCartPayload;
   }
 
-  const normalizedCart = normalizeCart(cart);
+  const normalizedCart = normalizeCart(cartPayload);
   if (normalizedCart.id.length === 0) {
     throw new Error("Failed to resolve cart id.");
   }
 
   writeCartIdCookie(cookiesStore, normalizedCart.id);
-  const items = await fetchCartItems(normalizedCart.id);
+  const items = normalizeCartItemsFromCart(cartPayload);
 
   return {
     cart: normalizedCart,
@@ -113,30 +189,27 @@ export async function getOrCreateCartSnapshot(
   };
 }
 
-export async function refreshCartSnapshot(cookiesStore: StarterCookieStore): Promise<StarterCartSnapshot | null> {
+export async function refreshCartSnapshot(
+  cookiesStore: StarterCookieStore,
+  language?: string,
+): Promise<StarterCartSnapshot | null> {
   const cartId = cartIdFromCookie(cookiesStore);
   if (!cartId) {
     return null;
   }
 
-  const sdk = createApiKeySdk();
-
-  let cart: Awaited<ReturnType<typeof sdk.commerce.carts.get>> | null = null;
-  try {
-    cart = await sdk.commerce.carts.get(cartId, {
-      include: "billingAddress,shippingAddress",
-    });
-  } catch {
+  const cartPayload = await fetchCartWithRelations(cartId, language);
+  if (!cartPayload) {
     return null;
   }
 
-  const normalizedCart = normalizeCart(cart);
+  const normalizedCart = normalizeCart(cartPayload);
   if (normalizedCart.id.length === 0) {
     return null;
   }
 
   writeCartIdCookie(cookiesStore, normalizedCart.id);
-  const items = await fetchCartItems(normalizedCart.id);
+  const items = normalizeCartItemsFromCart(cartPayload);
 
   return {
     cart: normalizedCart,

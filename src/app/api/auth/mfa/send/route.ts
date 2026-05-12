@@ -8,6 +8,7 @@ import {
 } from "@/lib/ominity/server/auth";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { isRecord, jsonError, parseJsonBody } from "@/lib/ominity/server/http";
+import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 
 export async function POST(request: Request): Promise<Response> {
   const cookieStore = await cookies();
@@ -38,7 +39,8 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const user = await loadUserFromAccessToken(session.accessToken);
+    const language = await resolveRequestSdkLanguage(request);
+    const user = await loadUserFromAccessToken(session.accessToken, language);
     const userId = typeof user?.id === "number" ? user.id : session.userId;
     if (!userId) {
       return jsonError(400, "MISSING_USER_ID", "Current session does not include a user id.");
@@ -48,6 +50,7 @@ export async function POST(request: Request): Promise<Response> {
       accessToken: session.accessToken,
       userId,
       method,
+      ...(typeof language === "string" ? { language } : {}),
     });
 
     return Response.json({

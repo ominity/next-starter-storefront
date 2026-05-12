@@ -40,6 +40,7 @@ const DEV_SESSION_SECRET = "development-only-ominity-session-secret-change-me";
 
 function resolveAuthClientSdkOptions(
   accessToken?: string,
+  language?: string,
 ): {
   serverURL: string;
   language?: string;
@@ -66,6 +67,7 @@ function resolveAuthClientSdkOptions(
 
   return {
     serverURL: config.apiUrl,
+    ...(typeof language === "string" && language.length > 0 ? { language } : {}),
     ...(typeof config.channelId === "string" ? { channelId: config.channelId } : {}),
     ...(security ? { security } : {}),
   };
@@ -119,9 +121,9 @@ function resolveCookieOptions(): AuthSessionCookieOptions {
   };
 }
 
-function createServerAuthClient(accessToken?: string) {
+function createServerAuthClient(accessToken?: string, language?: string) {
   return createAuthClient({
-    sdk: resolveAuthClientSdkOptions(accessToken),
+    sdk: resolveAuthClientSdkOptions(accessToken, language),
     debug: {
       enabled: getStarterOminityConfig().debugLogs,
     },
@@ -162,11 +164,12 @@ function toPublicMfaMethod(item: AuthMfaMethod): {
 export async function requestPasswordGrantToken(input: {
   readonly username: string;
   readonly password: string;
+  readonly language?: string;
 }): Promise<StarterOAuthToken> {
   const tokenConfig = resolveTokenConfig();
 
   return requestPasswordGrantTokenWithSdk({
-    sdk: resolveAuthClientSdkOptions(),
+    sdk: resolveAuthClientSdkOptions(undefined, input.language),
     username: input.username,
     password: input.password,
     clientId: tokenConfig.clientId,
@@ -177,11 +180,12 @@ export async function requestPasswordGrantToken(input: {
 
 export async function requestRefreshToken(input: {
   readonly refreshToken: string;
+  readonly language?: string;
 }): Promise<StarterOAuthToken> {
   const tokenConfig = resolveTokenConfig();
 
   return requestRefreshTokenWithSdk({
-    sdk: resolveAuthClientSdkOptions(),
+    sdk: resolveAuthClientSdkOptions(undefined, input.language),
     refreshToken: input.refreshToken,
     clientId: tokenConfig.clientId,
     clientSecret: tokenConfig.clientSecret,
@@ -221,8 +225,11 @@ export function clearAuthSessionCookie(cookiesStore: StarterCookieStore): void {
   clearAuthSessionCookieWithSdk(cookiesStore, resolveCookieOptions());
 }
 
-export async function loadUserFromAccessToken(accessToken: string): Promise<StarterApiUser | null> {
-  const sdk = createOAuthSdk(accessToken);
+export async function loadUserFromAccessToken(
+  accessToken: string,
+  language?: string,
+): Promise<StarterApiUser | null> {
+  const sdk = createOAuthSdk(accessToken, language);
   const me = await sdk.me.get();
   return normalizeUser(me);
 }
@@ -230,6 +237,7 @@ export async function loadUserFromAccessToken(accessToken: string): Promise<Star
 export async function listUserMfaMethods(input: {
   readonly accessToken: string;
   readonly userId: number;
+  readonly language?: string;
 }): Promise<ReadonlyArray<{
   method: string;
   isEnabled: boolean;
@@ -237,7 +245,7 @@ export async function listUserMfaMethods(input: {
   lastUsedAt?: string | null;
   lastSentAt?: string | null;
 }>> {
-  const authClient = createServerAuthClient(input.accessToken);
+  const authClient = createServerAuthClient(input.accessToken, input.language);
   const response = await authClient.listUserMfaMethods({
     userId: input.userId,
   });
@@ -249,8 +257,9 @@ export async function sendUserMfaCode(input: {
   readonly accessToken: string;
   readonly userId: number;
   readonly method: string;
+  readonly language?: string;
 }): Promise<{ ok: boolean; method: string }> {
-  const authClient = createServerAuthClient(input.accessToken);
+  const authClient = createServerAuthClient(input.accessToken, input.language);
   const result = await authClient.sendUserMfaCode({
     userId: input.userId,
     method: input.method,
@@ -267,6 +276,7 @@ export async function validateUserMfaCode(input: {
   readonly userId: number;
   readonly method: string;
   readonly code: string;
+  readonly language?: string;
 }): Promise<{
   ok: boolean;
   method: string;
@@ -278,7 +288,7 @@ export async function validateUserMfaCode(input: {
     lastSentAt?: string | null;
   };
 }> {
-  const authClient = createServerAuthClient(input.accessToken);
+  const authClient = createServerAuthClient(input.accessToken, input.language);
   const result = await authClient.validateUserMfaCode({
     userId: input.userId,
     method: input.method,
@@ -306,8 +316,9 @@ export async function validateUserRecoveryCode(input: {
   readonly accessToken: string;
   readonly userId: number;
   readonly code: string;
+  readonly language?: string;
 }): Promise<{ ok: boolean }> {
-  const authClient = createServerAuthClient(input.accessToken);
+  const authClient = createServerAuthClient(input.accessToken, input.language);
   const result = await authClient.validateUserRecoveryCode({
     userId: input.userId,
     code: input.code,
@@ -323,8 +334,9 @@ export async function sendPasswordResetLink(input: {
   readonly redirectUrl: string;
   readonly userAgent?: string | null;
   readonly ipAddress?: string | null;
+  readonly language?: string;
 }): Promise<{ ok: boolean; message: string; expiresAt?: string }> {
-  const authClient = createServerAuthClient();
+  const authClient = createServerAuthClient(undefined, input.language);
   const result = await authClient.sendPasswordResetLink({
     email: input.email,
     redirectUrl: input.redirectUrl,
@@ -349,8 +361,9 @@ export async function resetPassword(input: {
   readonly password: string;
   readonly userAgent?: string | null;
   readonly ipAddress?: string | null;
+  readonly language?: string;
 }): Promise<{ ok: boolean; message: string; updatedAt?: string }> {
-  const authClient = createServerAuthClient();
+  const authClient = createServerAuthClient(undefined, input.language);
   const result = await authClient.resetPassword({
     email: input.email,
     token: input.token,

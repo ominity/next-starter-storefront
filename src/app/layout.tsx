@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { OminityDebugBar } from "@ominity/next/debug";
 
 import { CommerceProvider } from "@/components/commerce/commerce-provider";
 import { SiteHeader } from "@/components/site/site-header";
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <footer className="border-t py-6 text-center text-xs text-muted-foreground">
                 Ominity Next Starter · Built for reusable CMS-driven projects.
               </footer>
+              <OminityDebugBar enabled={config.debugBar} endpoint="/api/debug/sdk-requests" />
             </div>
           </CommerceProvider>
         </AuthProvider>

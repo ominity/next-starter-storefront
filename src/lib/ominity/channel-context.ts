@@ -3,8 +3,9 @@ import { normalizeLocaleCode, parseLocaleCode, toLocaleCode, type CmsLocale } fr
 
 import { getStarterOminityConfig } from "./env";
 import { MOCK_CHANNEL, MOCK_LOCALES } from "./mock-data";
+import { getOminityDebugHttpClient } from "./server/sdk-debug-fetcher";
 
-const CHANNEL_INCLUDE = "languages,countries,currencies,default_language,default_country,default_currency";
+const CHANNEL_INCLUDE = "languages,countries,currencies,defaultLanguage,defaultCountry,defaultCurrency";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -18,11 +19,15 @@ interface NormalizedChannelLanguage {
 
 interface NormalizedChannelCountry {
   readonly code: string;
+  readonly name?: string;
   readonly language?: string;
+  readonly currency?: string;
 }
 
 interface NormalizedChannelCurrency {
   readonly code: string;
+  readonly name?: string;
+  readonly symbol?: string;
 }
 
 interface NormalizedStarterChannel {
@@ -40,9 +45,12 @@ export interface StarterChannelContext {
   readonly id?: string;
   readonly identifier?: string;
   readonly defaultLocale: string;
+  readonly defaultCountry?: string;
+  readonly defaultCurrency?: string;
   readonly locales: ReadonlyArray<CmsLocale>;
   readonly languages: ReadonlyArray<string>;
   readonly countries: ReadonlyArray<string>;
+  readonly countryCurrencyMap: Readonly<Record<string, string>>;
   readonly currencies: ReadonlyArray<string>;
 }
 
@@ -104,10 +112,14 @@ function normalizeChannelCountry(input: unknown): NormalizedChannelCountry | nul
     return null;
   }
 
+  const name = asString(input.name);
   const language = asString(input.language);
+  const currency = asString(input.currency);
   return {
     code: code.toUpperCase(),
+    ...(name ? { name } : {}),
     ...(language ? { language: normalizeLocaleCode(language) } : {}),
+    ...(currency ? { currency: currency.toUpperCase() } : {}),
   };
 }
 
@@ -121,8 +133,12 @@ function normalizeChannelCurrency(input: unknown): NormalizedChannelCurrency | n
     return null;
   }
 
+  const name = asString(input.name);
+  const symbol = asString(input.symbol);
   return {
     code: code.toUpperCase(),
+    ...(name ? { name } : {}),
+    ...(symbol ? { symbol } : {}),
   };
 }
 
@@ -152,9 +168,12 @@ function buildFallbackContext(fallbackLocale = "en"): StarterChannelContext {
 
   return {
     defaultLocale: normalizedFallback,
+    ...(parsedFallback.country ? { defaultCountry: parsedFallback.country } : {}),
+    defaultCurrency: "EUR",
     locales: [locale],
     languages: [locale.language],
     countries: parsedFallback.country ? [parsedFallback.country] : [],
+    countryCurrencyMap: parsedFallback.country ? { [parsedFallback.country]: "EUR" } : {},
     currencies: [],
   };
 }
@@ -253,14 +272,28 @@ function withDefaultLocale(
     ),
   );
   const currencyCodes = Array.from(new Set(channel.currencies.map((entry) => entry.code)));
+  const countryCurrencyMap = Object.fromEntries(
+    channel.countries
+      .filter((entry) => typeof entry.currency === "string" && entry.currency.length > 0)
+      .map((entry) => [entry.code.toUpperCase(), entry.currency!.toUpperCase()]),
+  );
+  const defaultCountry = channel.defaultCountryCode
+    ?? parseLocaleCode(chosenDefault).country
+    ?? countryCodes[0];
+  const defaultCurrency = channel.defaultCurrencyCode
+    ?? (typeof defaultCountry === "string" ? countryCurrencyMap[defaultCountry.toUpperCase()] : undefined)
+    ?? currencyCodes[0];
 
   return {
     ...(channel.id ? { id: channel.id } : {}),
     ...(channel.identifier ? { identifier: channel.identifier } : {}),
     defaultLocale: chosenDefault,
+    ...(typeof defaultCountry === "string" ? { defaultCountry: defaultCountry.toUpperCase() } : {}),
+    ...(typeof defaultCurrency === "string" ? { defaultCurrency: defaultCurrency.toUpperCase() } : {}),
     locales: normalizedLocales,
     languages: languageCodes,
     countries: countryCodes,
+    countryCurrencyMap,
     currencies: currencyCodes,
   };
 }
@@ -288,18 +321,24 @@ function normalizeStarterChannel(input: unknown): NormalizedStarterChannel {
 
   const defaultLanguageRecord = isRecord(input.defaultLanguage)
     ? input.defaultLanguage
-    : embedded && isRecord(embedded.default_language)
-      ? embedded.default_language as UnknownRecord
+    : embedded && isRecord(embedded.defaultLanguage)
+      ? embedded.defaultLanguage as UnknownRecord
+      : embedded && isRecord(embedded.default_language)
+        ? embedded.default_language as UnknownRecord
       : undefined;
   const defaultCountryRecord = isRecord(input.defaultCountry)
     ? input.defaultCountry
-    : embedded && isRecord(embedded.default_country)
-      ? embedded.default_country as UnknownRecord
+    : embedded && isRecord(embedded.defaultCountry)
+      ? embedded.defaultCountry as UnknownRecord
+      : embedded && isRecord(embedded.default_country)
+        ? embedded.default_country as UnknownRecord
       : undefined;
   const defaultCurrencyRecord = isRecord(input.defaultCurrency)
     ? input.defaultCurrency
-    : embedded && isRecord(embedded.default_currency)
-      ? embedded.default_currency as UnknownRecord
+    : embedded && isRecord(embedded.defaultCurrency)
+      ? embedded.defaultCurrency as UnknownRecord
+      : embedded && isRecord(embedded.default_currency)
+        ? embedded.default_currency as UnknownRecord
       : undefined;
 
   const defaultLanguageCode = defaultLanguageRecord && asString(defaultLanguageRecord.code)
@@ -335,14 +374,30 @@ function mockChannelContext(): StarterChannelContext {
     ...(locale.default === true ? { default: true } : {}),
   }));
   const defaultLocale = locales.find((entry) => entry.default)?.code ?? locales[0]?.code ?? "en";
+  const defaultCountry = parseLocaleCode(normalizeLocaleCode(defaultLocale)).country
+    ?? MOCK_CHANNEL.countries[0]?.code
+    ?? undefined;
 
   return {
     id: MOCK_CHANNEL.id,
     identifier: MOCK_CHANNEL.identifier,
     defaultLocale: normalizeLocaleCode(defaultLocale),
+    ...(typeof defaultCountry === "string" ? { defaultCountry: defaultCountry.toUpperCase() } : {}),
+    defaultCurrency: "EUR",
     locales,
     languages: MOCK_CHANNEL.languages.map((entry) => normalizeLocaleCode(entry.code)),
     countries: MOCK_CHANNEL.countries.map((entry) => entry.code.toUpperCase()),
+    countryCurrencyMap: Object.fromEntries(
+      MOCK_CHANNEL.countries
+        .flatMap((entry) => {
+          const currency = (entry as { currency?: string }).currency;
+          if (!currency) {
+            return [];
+          }
+
+          return [[entry.code.toUpperCase(), currency.toUpperCase()] as const];
+        }),
+    ),
     currencies: ["EUR"],
   };
 }
@@ -353,8 +408,10 @@ async function fetchLiveChannelContext(): Promise<StarterChannelContext> {
     return buildFallbackContext(config.defaultLocale);
   }
 
+  const debugHttpClient = getOminityDebugHttpClient("sdk");
   const sdk = new Ominity({
     serverURL: config.apiUrl,
+    ...(debugHttpClient ? { httpClient: debugHttpClient } : {}),
     security: {
       apiKey: config.apiKey,
     },

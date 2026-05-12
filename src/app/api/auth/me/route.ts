@@ -8,8 +8,9 @@ import {
   writeAuthSessionCookie,
 } from "@/lib/ominity/server/auth";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
+import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const config = getStarterOminityConfig();
   const cookieStore = await cookies();
   const session = await readAuthSessionCookie(cookieStore);
@@ -43,7 +44,8 @@ export async function GET(): Promise<Response> {
   }
 
   try {
-    const user = await loadUserFromAccessToken(session.accessToken);
+    const language = await resolveRequestSdkLanguage(request);
+    const user = await loadUserFromAccessToken(session.accessToken, language);
     const mergedSession = {
       ...session,
       ...(typeof user?.id === "number" ? { userId: user.id } : {}),

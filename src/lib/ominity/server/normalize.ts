@@ -166,14 +166,19 @@ export function normalizeCart(input: unknown): StarterApiCart {
 export function normalizeCartItem(input: unknown): StarterApiCartItem {
   const record = isRecord(input) ? input : {};
   const product = isRecord(record.product) ? record.product : {};
+  const offer = isRecord(record.offer) ? record.offer : {};
   const currency = asString(record.currency)
+    ?? asString(offer.currency)
     ?? asString(product.currency)
     ?? "EUR";
   const quantity = asNumber(record.quantity) ?? asNumber(record.qty) ?? 1;
   const productIdFromRecord = normalizeId(record.productId);
   const productIdFromProduct = normalizeId(product.id);
   const sku = asString(record.sku) ?? asString(product.sku);
-  const title = asString(record.title) ?? asString(record.name) ?? asString(product.title);
+  const title = asString(record.title)
+    ?? asString(record.name)
+    ?? asString(offer.title)
+    ?? asString(product.title);
   const imageUrl = asString(record.imageUrl) ?? asString(product.coverImage);
 
   return {
@@ -187,10 +192,26 @@ export function normalizeCartItem(input: unknown): StarterApiCartItem {
     ...(typeof title === "string" ? { title } : {}),
     quantity: quantity > 0 ? Math.floor(quantity) : 1,
     unitPrice: normalizeMoney(
-      record.unitPrice ?? record.price ?? record.unitAmount ?? product.price,
+      record.unitPrice
+      ?? record.price
+      ?? record.unitAmount
+      ?? offer.unitPrice
+      ?? offer.price
+      ?? offer.unitAmount
+      ?? offer.amount
+      ?? product.price,
       currency,
     ),
-    totalPrice: normalizeMoney(record.totalPrice ?? record.total ?? record.totalAmount, currency),
+    totalPrice: normalizeMoney(
+      record.totalPrice
+      ?? record.total
+      ?? record.totalAmount
+      ?? offer.totalPrice
+      ?? offer.total
+      ?? offer.totalAmount
+      ?? offer.amount,
+      currency,
+    ),
     ...(typeof imageUrl === "string" ? { imageUrl } : {}),
   };
 }
@@ -199,6 +220,30 @@ export function normalizeCartItems(input: unknown): ReadonlyArray<StarterApiCart
   return normalizeList(input)
     .map((entry) => normalizeCartItem(entry))
     .filter((entry) => entry.id.length > 0);
+}
+
+export function normalizeCartItemsFromCart(input: unknown): ReadonlyArray<StarterApiCartItem> {
+  if (!isRecord(input)) {
+    return [];
+  }
+
+  if (Array.isArray(input.items)) {
+    return normalizeCartItems(input.items);
+  }
+
+  if (isRecord(input._embedded)) {
+    const embeddedItems = input._embedded.items;
+    if (Array.isArray(embeddedItems)) {
+      return normalizeCartItems(embeddedItems);
+    }
+
+    const embeddedCartItems = input._embedded.cartItems;
+    if (Array.isArray(embeddedCartItems)) {
+      return normalizeCartItems(embeddedCartItems);
+    }
+  }
+
+  return [];
 }
 
 export function normalizeOrder(input: unknown): StarterApiOrder {

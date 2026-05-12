@@ -12,9 +12,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ominity/api-module-forms": "^1.0.0",
-    "@ominity/api-typescript": "^1.1.1",
-    "@ominity/next": "^1.0.2",
+    "@ominity/api-module-forms": "^1.0.1",
+    "@ominity/api-typescript": "^1.1.4",
+    "@ominity/next": "^1.1.5",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-switch": "^1.2.6",
@@ -26,7 +26,8 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.56.4",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "vaul": "^1.1.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.7",

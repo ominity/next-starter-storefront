@@ -3,10 +3,11 @@ import { cookies } from "next/headers";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { getOrCreateCartSnapshot } from "@/lib/ominity/server/commerce";
 import { isRecord, jsonError, parseJsonBody } from "@/lib/ominity/server/http";
+import { resolveRequestCountry, resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { mockGetOrCreateCart } from "@/lib/ominity/server/mock-commerce";
 import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const config = getStarterOminityConfig();
   const cookieStore = await cookies();
 
@@ -28,7 +29,13 @@ export async function GET(): Promise<Response> {
   }
 
   try {
-    const snapshot = await getOrCreateCartSnapshot(cookieStore);
+    const language = await resolveRequestSdkLanguage(request);
+    const country = await resolveRequestCountry(request);
+    const snapshot = await getOrCreateCartSnapshot(
+      cookieStore,
+      country ? { country } : {},
+      language,
+    );
     return Response.json(snapshot);
   } catch (error) {
     return jsonError(500, "CART_LOAD_FAILED", "Failed to load cart.", {
@@ -70,10 +77,13 @@ export async function PATCH(request: Request): Promise<Response> {
   }
 
   try {
-    const snapshot = await getOrCreateCartSnapshot(cookieStore);
-    const sdk = createApiKeySdk();
+    const language = await resolveRequestSdkLanguage(request);
+    const country = await resolveRequestCountry(request);
+    const createCartData = country ? { country } : {};
+    const snapshot = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
+    const sdk = createApiKeySdk(language);
     await sdk.commerce.carts.update(snapshot.cart.id, payload.data as Record<string, any>);
-    const refreshed = await getOrCreateCartSnapshot(cookieStore);
+    const refreshed = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
 
     return Response.json(refreshed);
   } catch (error) {
