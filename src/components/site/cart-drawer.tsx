@@ -6,6 +6,13 @@ import { ShoppingCart } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useCommerce } from "@/components/commerce/commerce-provider";
+import {
+  commerceCartItemCurrency,
+  commerceCartItemId,
+  commerceCartItemQuantity,
+  commerceCartItemTitle,
+  commerceCartItemTotalPrice,
+} from "@ominity/next/commerce";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Drawer,
@@ -33,7 +40,7 @@ export function CartDrawer(props: CartDrawerProps) {
   const commerce = useCommerce();
   const [open, setOpen] = useState(false);
 
-  const currency = commerce.cart[0]?.currency ?? "EUR";
+  const currency = commerce.cartCurrency ?? "EUR";
   const subtotal = useMemo(() => formatMoney(commerce.cartSubtotal, currency), [commerce.cartSubtotal, currency]);
 
   return (
@@ -67,19 +74,19 @@ export function CartDrawer(props: CartDrawerProps) {
           ) : (
             <div className="space-y-3 pb-2">
               {commerce.cart.slice(0, 6).map((item) => (
-                <div key={item.id} className="rounded border p-3">
+                <div key={commerceCartItemId(item)} className="rounded border p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <p className="text-sm font-medium">{item.title ?? item.sku ?? item.id}</p>
+                      <p className="text-sm font-medium">{commerceCartItemTitle(item)}</p>
                       <p className="text-xs text-muted-foreground">
-                        Qty {item.quantity} · {formatMoney(item.totalPrice, item.currency)}
+                        Qty {commerceCartItemQuantity(item)} · {formatMoney(commerceCartItemTotalPrice(item), commerceCartItemCurrency(item))}
                       </p>
                     </div>
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={() => { void commerce.removeFromCart(item.id); }}
+                      onClick={() => { void commerce.removeFromCart(commerceCartItemId(item)); }}
                     >
                       Remove
                     </Button>

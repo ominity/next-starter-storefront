@@ -15,8 +15,8 @@ importers:
         specifier: ^1.1.5
         version: 1.1.5
       '@ominity/next':
-        specifier: ^1.2.0
-        version: 1.2.0(@ominity/api-typescript@1.1.5)(next@16.2.3(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react-hook-form@7.72.1(react@19.2.5))(react@19.2.5)(typescript@5.9.3)
+        specifier: ^1.2.1
+        version: 1.2.1(@ominity/api-typescript@1.1.5)(next@16.2.3(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react-hook-form@7.72.1(react@19.2.5))(react@19.2.5)(typescript@5.9.3)
       '@radix-ui/react-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -490,8 +490,8 @@ packages:
   '@ominity/api-typescript@1.1.5':
     resolution: {integrity: sha512-Z+Xk/YANjHwpX4TJOR92WH4HqU7TFj0dMPPzCwl85bCo4P4rZ8YxQ0LynvQ+fiiHRuD6+0sV33K3MBvGVMs48A==}
 
-  '@ominity/next@1.2.0':
-    resolution: {integrity: sha512-4qiFelzIEUMIXUP0AzlUi4rYxilLehdT5L6aov8s6OBDAsllsxODhRf3sziUrPjaD9HY3/izdlkuwPsH4WgfLg==}
+  '@ominity/next@1.2.1':
+    resolution: {integrity: sha512-7fCvFC6FCyQ9wolIeK6HkQK+y/36DXwppRG1TYHy4zqBYpXzypNfhsEBd3XZKQ95dpEJVl1wTNdqPuZEibT3ew==}
     peerDependencies:
       '@ominity/api-typescript': ^1.1.1
       next: ^15.0.0 || ^16.0.0
@@ -2957,7 +2957,7 @@ snapshots:
     dependencies:
       zod: 4.4.3
 
-  '@ominity/next@1.2.0(@ominity/api-typescript@1.1.5)(next@16.2.3(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react-hook-form@7.72.1(react@19.2.5))(react@19.2.5)(typescript@5.9.3)':
+  '@ominity/next@1.2.1(@ominity/api-typescript@1.1.5)(next@16.2.3(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react-hook-form@7.72.1(react@19.2.5))(react@19.2.5)(typescript@5.9.3)':
     dependencies:
       '@ominity/api-typescript': 1.1.5
       next: 16.2.3(@babel/core@7.29.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)

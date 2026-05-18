@@ -1,11 +1,17 @@
 import type { CurrencyAmount } from "@ominity/api-typescript/models/common/amount";
 import type { Address } from "@ominity/api-typescript/models/commerce/address";
 import type {
-  CommerceCart,
-  CommerceCartItem,
-  CommerceOrder,
-  CommercePayment,
-} from "@ominity/next/commerce";
+  Cart as CommerceCart,
+} from "@ominity/api-typescript/models/commerce/cart";
+import type {
+  CartItem as CommerceCartItem,
+} from "@ominity/api-typescript/models/commerce/cart-item";
+import type {
+  Order as CommerceOrder,
+} from "@ominity/api-typescript/models/commerce/order";
+import type {
+  Payment as CommercePayment,
+} from "@ominity/api-typescript/models/commerce/payment";
 
 interface MockCartRecord {
   id: string;

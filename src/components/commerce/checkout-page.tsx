@@ -6,6 +6,14 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 
 import { useCommerce } from "@/components/commerce/commerce-provider";
+import {
+  commerceCartItemCurrency,
+  commerceOrderId,
+  commerceCartItemId,
+  commerceCartItemQuantity,
+  commerceCartItemTitle,
+  commerceCartItemTotalPrice,
+} from "@ominity/next/commerce";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -69,8 +77,8 @@ export function CommerceCheckoutPage(props: CommerceCheckoutPageProps) {
   const checkoutBlockedByAuth = props.features.auth && !props.features.guestCheckout && !hasSession;
 
   const cartCurrency = useMemo(
-    () => commerce.cart[0]?.currency ?? "EUR",
-    [commerce.cart],
+    () => commerce.cartCurrency ?? "EUR",
+    [commerce.cartCurrency],
   );
 
   const resolvedEmail = useMemo(() => {
@@ -96,7 +104,7 @@ export function CommerceCheckoutPage(props: CommerceCheckoutPageProps) {
       mode: hasSession ? "authenticated" : "guest",
       cartCount: commerce.cartCount,
       cartSubtotal: commerce.cartSubtotal,
-      ...(commerce.cart[0]?.currency ? { currency: commerce.cart[0].currency } : {}),
+      ...(commerce.cart[0] ? { currency: commerceCartItemCurrency(commerce.cart[0]) } : {}),
       ...(commerce.promotionCodes.length > 0 ? { promotionCodes: commerce.promotionCodes } : {}),
     });
   }, [
@@ -255,11 +263,11 @@ export function CommerceCheckoutPage(props: CommerceCheckoutPageProps) {
       }
 
       if (props.features.payment) {
-        router.push(`${props.paths.payment}?order=${encodeURIComponent(order.id)}` as Route);
+        router.push(`${props.paths.payment}?order=${encodeURIComponent(commerceOrderId(order))}` as Route);
         return;
       }
 
-      setMessage(`Order placed: ${order.id}`);
+      setMessage(`Order placed: ${commerceOrderId(order)}`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create order.");
     } finally {
@@ -440,9 +448,9 @@ export function CommerceCheckoutPage(props: CommerceCheckoutPageProps) {
         </CardHeader>
         <CardContent className="space-y-2">
           {commerce.cart.map((item) => (
-            <div key={item.id} className="flex items-center justify-between text-sm">
-              <span>{item.title ?? item.sku ?? item.id} × {item.quantity}</span>
-              <span>{formatMoney(item.totalPrice, item.currency)}</span>
+            <div key={commerceCartItemId(item)} className="flex items-center justify-between text-sm">
+              <span>{commerceCartItemTitle(item)} × {commerceCartItemQuantity(item)}</span>
+              <span>{formatMoney(commerceCartItemTotalPrice(item), commerceCartItemCurrency(item))}</span>
             </div>
           ))}
           <div className="flex items-center justify-between border-t pt-2 text-sm font-semibold">

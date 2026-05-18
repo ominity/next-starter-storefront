@@ -5,6 +5,14 @@ import Link from "next/link";
 import type { Route } from "next";
 
 import { useCommerce, type CommerceOrder, type CommercePayment } from "@/components/commerce/commerce-provider";
+import {
+  commerceOrderCurrency,
+  commerceOrderId,
+  commerceOrderTotal,
+  commercePaymentAmount,
+  commercePaymentCurrency,
+  commercePaymentId,
+} from "@ominity/next/commerce";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/lib/ominity/commerce";
 
@@ -113,7 +121,7 @@ export function CommercePaymentPage(props: CommercePaymentPageProps) {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">Payment</CardTitle>
-          <CardDescription>Order {order.number ?? order.id}</CardDescription>
+          <CardDescription>Order {order.number ?? commerceOrderId(order)}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <p className="text-muted-foreground">
@@ -130,7 +138,7 @@ export function CommercePaymentPage(props: CommercePaymentPageProps) {
             </div>
             <div className="flex items-center justify-between">
               <span>Total</span>
-              <span className="font-semibold">{formatMoney(order.total, order.currency)}</span>
+              <span className="font-semibold">{formatMoney(commerceOrderTotal(order), commerceOrderCurrency(order))}</span>
             </div>
             {order.createdAt && (
               <div className="flex items-center justify-between">
@@ -147,14 +155,14 @@ export function CommercePaymentPage(props: CommercePaymentPageProps) {
             ) : (
               <div className="space-y-2">
                 {payments.map((payment) => (
-                  <div key={payment.id} className="rounded-md border p-3">
+                  <div key={commercePaymentId(payment)} className="rounded-md border p-3">
                     <div className="flex items-center justify-between">
-                      <span>{payment.id}</span>
+                      <span>{commercePaymentId(payment)}</span>
                       <span className="font-medium">{payment.status}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Amount</span>
-                      <span>{formatMoney(payment.amount, payment.currency)}</span>
+                      <span>{formatMoney(commercePaymentAmount(payment), commercePaymentCurrency(payment))}</span>
                     </div>
                     {payment.createdAt && (
                       <div className="flex items-center justify-between">

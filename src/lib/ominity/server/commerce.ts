@@ -1,9 +1,9 @@
 import type { OminityOptions } from "@ominity/api-typescript";
+import type { Cart } from "@ominity/api-typescript/models/commerce/cart";
+import type { CartItem } from "@ominity/api-typescript/models/commerce/cart-item";
 import { normalizeLocaleCode, parseLocaleCode } from "@ominity/next/cms";
 import {
   createCommerceClient,
-  type CommerceCart,
-  type CommerceCartItem,
   type CommerceClient,
 } from "@ominity/next/commerce";
 import {
@@ -40,8 +40,8 @@ export interface StarterCookieStore {
 }
 
 export interface StarterCartSnapshot {
-  readonly cart: CommerceCart;
-  readonly items: ReadonlyArray<CommerceCartItem>;
+  readonly cart: Cart;
+  readonly items: ReadonlyArray<CartItem>;
   readonly created: boolean;
 }
 

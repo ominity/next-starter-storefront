@@ -2,10 +2,29 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
-  CommerceCart as ApiCart,
-  CommerceCartItem as ApiCartItem,
-  CommerceOrder as ApiOrder,
-  CommercePayment as ApiPayment,
+  Cart as ApiCart,
+} from "@ominity/api-typescript/models/commerce/cart";
+import type {
+  CartItem as ApiCartItem,
+} from "@ominity/api-typescript/models/commerce/cart-item";
+import type {
+  Order as ApiOrder,
+} from "@ominity/api-typescript/models/commerce/order";
+import type {
+  Payment as ApiPayment,
+} from "@ominity/api-typescript/models/commerce/payment";
+import {
+  commerceCartItemCurrency,
+  commerceCartItemId,
+  commerceCartItemProductId,
+  commerceCartItemQuantity,
+  commerceCartItemSku,
+  commerceCartItemTitle,
+  commerceCartItemTotalPrice,
+  commerceOrderCurrency,
+  commerceOrderId,
+  commerceOrderTotal,
+  commercePaymentId,
 } from "@ominity/next/commerce";
 import { emitCommerceEvent } from "@/lib/ominity/commerce/events";
 
@@ -19,36 +38,12 @@ export interface CommerceCatalogProduct {
   readonly coverImage?: string;
 }
 
-export interface CommerceCartItem {
-  readonly id: string;
-  readonly productId?: string;
-  readonly sku?: string;
-  readonly title?: string;
-  readonly quantity: number;
-  readonly unitPrice: number;
-  readonly totalPrice: number;
-  readonly currency: string;
-  readonly imageUrl?: string;
-}
+export type CommerceCartItem = ApiCartItem;
 
 export interface CommerceWishlistItem extends CommerceCatalogProduct {}
 
-export interface CommerceOrder {
-  readonly id: string;
-  readonly status: string;
-  readonly number?: string;
-  readonly createdAt?: string;
-  readonly total: number;
-  readonly currency: string;
-}
-
-export interface CommercePayment {
-  readonly id: string;
-  readonly status: string;
-  readonly amount: number;
-  readonly currency: string;
-  readonly createdAt?: string;
-}
+export type CommerceOrder = ApiOrder;
+export type CommercePayment = ApiPayment;
 
 export interface CommerceCreateOrderInput {
   readonly fullName?: string;
@@ -107,75 +102,6 @@ function writeStorage<T>(key: string, value: T): void {
   } catch {}
 }
 
-function asNumber(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number.parseFloat(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-
-  return undefined;
-}
-
-function asRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
-  return typeof value === "object" && value !== null
-    ? value as Readonly<Record<string, unknown>>
-    : undefined;
-}
-
-function asString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function toStringId(value: unknown): string | undefined {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
-  }
-
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return `${Math.floor(value)}`;
-  }
-
-  return undefined;
-}
-
-function moneyValue(value: unknown): number | undefined {
-  const direct = asNumber(value);
-  if (typeof direct === "number") {
-    return direct;
-  }
-
-  const record = asRecord(value);
-  if (!record) {
-    return undefined;
-  }
-
-  return asNumber(record.value)
-    ?? asNumber(record.amount)
-    ?? asNumber(record.gross)
-    ?? asNumber(record.price);
-}
-
-function moneyCurrency(value: unknown): string | undefined {
-  const record = asRecord(value);
-  if (!record) {
-    return undefined;
-  }
-
-  return asString(record.currency) ?? asString(record.currencyCode);
-}
-
 function requestHeaders(init?: HeadersInit): HeadersInit {
   return {
     "Content-Type": "application/json",
@@ -212,77 +138,7 @@ function normalizeCartItems(items: ReadonlyArray<ApiCartItem> | undefined): Read
     return [];
   }
 
-  return items.flatMap((entry): CommerceCartItem[] => {
-    const record = asRecord(entry);
-    if (!record) {
-      return [];
-    }
-
-    const id = toStringId(record.id) ?? "";
-    if (id.length === 0) {
-      return [];
-    }
-
-    const embedded = asRecord(record._embedded);
-    const product = asRecord(record.product) ?? asRecord(embedded?.product);
-    const offer = asRecord(record.offer) ?? asRecord(embedded?.offer);
-    const quantity = asNumber(record.quantity) ?? 1;
-    const unitPrice = moneyValue(record.unitPrice)
-      ?? moneyValue(record.unitAmount)
-      ?? moneyValue(record.price)
-      ?? moneyValue(offer?.unitPrice)
-      ?? moneyValue(offer?.unitAmount)
-      ?? moneyValue(offer?.amount)
-      ?? 0;
-    const totalPrice = moneyValue(record.totalPrice)
-      ?? moneyValue(record.totalAmount)
-      ?? moneyValue(record.total)
-      ?? moneyValue(offer?.totalPrice)
-      ?? moneyValue(offer?.totalAmount)
-      ?? moneyValue(offer?.amount)
-      ?? unitPrice * quantity;
-    const currency = moneyCurrency(record.unitPrice)
-      ?? moneyCurrency(record.unitAmount)
-      ?? moneyCurrency(record.totalPrice)
-      ?? moneyCurrency(record.totalAmount)
-      ?? moneyCurrency(offer?.unitPrice)
-      ?? moneyCurrency(offer?.unitAmount)
-      ?? moneyCurrency(offer?.amount)
-      ?? asString(record.currency)
-      ?? asString(product?.currency)
-      ?? "EUR";
-    const productId = record.productId ?? record.product_id ?? product?.id;
-    const sku = asString(record.sku) ?? asString(product?.sku);
-    const title = asString(record.title)
-      ?? asString(record.name)
-      ?? asString(product?.title)
-      ?? asString(product?.shortTitle);
-    const additionalImages = Array.isArray(product?.additionalImages)
-      ? product.additionalImages
-      : [];
-    const firstAdditionalImage = additionalImages.find((value) => {
-      return typeof value === "string" && value.trim().length > 0;
-    });
-    const imageUrl = asString(record.imageUrl)
-      ?? asString(product?.coverImage)
-      ?? (typeof firstAdditionalImage === "string" ? firstAdditionalImage : undefined);
-
-    return [{
-      id,
-      ...(typeof productId === "string"
-        ? { productId }
-        : typeof productId === "number" && Number.isFinite(productId)
-          ? { productId: `${productId}` }
-          : {}),
-      ...(typeof sku === "string" ? { sku } : {}),
-      ...(typeof title === "string" ? { title } : {}),
-      quantity: quantity > 0 ? Math.floor(quantity) : 1,
-      unitPrice,
-      totalPrice,
-      currency: currency.toUpperCase(),
-      ...(typeof imageUrl === "string" ? { imageUrl } : {}),
-    }];
-  });
+  return items.filter((entry) => commerceCartItemId(entry).length > 0);
 }
 
 function normalizePromotionCodes(value: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
@@ -307,22 +163,8 @@ function normalizeOrder(order: ApiOrder | undefined): CommerceOrder | null {
   if (!order) {
     return null;
   }
-  const id = toStringId((order as unknown as { id?: unknown }).id) ?? "";
-  if (id.length === 0) {
-    return null;
-  }
 
-  const total = moneyValue(order.totalAmount) ?? 0;
-  const currency = (moneyCurrency(order.totalAmount) ?? "EUR").toUpperCase();
-
-  return {
-    id,
-    status: typeof order.status === "string" ? order.status : "unknown",
-    ...(typeof order.number === "string" ? { number: order.number } : {}),
-    ...(typeof order.createdAt === "string" ? { createdAt: order.createdAt } : {}),
-    total,
-    currency,
-  };
+  return commerceOrderId(order).length > 0 ? order : null;
 }
 
 function normalizePayments(items: ReadonlyArray<ApiPayment> | undefined): ReadonlyArray<CommercePayment> {
@@ -330,19 +172,8 @@ function normalizePayments(items: ReadonlyArray<ApiPayment> | undefined): Readon
     return [];
   }
 
-  return items.flatMap((entry): CommercePayment[] => {
-    const id = toStringId((entry as unknown as { id?: unknown }).id) ?? "";
-    if (id.length === 0) {
-      return [];
-    }
-
-    return [{
-      id,
-      status: typeof entry.status === "string" ? entry.status : "unknown",
-      amount: moneyValue(entry.amount) ?? 0,
-      currency: (moneyCurrency(entry.amount) ?? "EUR").toUpperCase(),
-      ...(typeof entry.createdAt === "string" ? { createdAt: entry.createdAt } : {}),
-    }];
+  return items.filter((entry) => {
+    return commercePaymentId(entry).length > 0;
   });
 }
 
@@ -376,16 +207,21 @@ function splitFullName(fullName: string | undefined): { firstName?: string; last
 }
 
 function cartCountFromItems(items: ReadonlyArray<CommerceCartItem>): number {
-  return items.reduce((sum, item) => sum + item.quantity, 0);
+  return items.reduce((sum, item) => sum + commerceCartItemQuantity(item), 0);
 }
 
 function cartSubtotalFromItems(items: ReadonlyArray<CommerceCartItem>): number {
-  return items.reduce((sum, item) => sum + item.totalPrice, 0);
+  return items.reduce((sum, item) => sum + commerceCartItemTotalPrice(item), 0);
 }
 
 function cartCurrencyFromItems(items: ReadonlyArray<CommerceCartItem>): string | undefined {
-  const currency = items[0]?.currency;
-  return typeof currency === "string" && currency.length > 0 ? currency : undefined;
+  const first = items[0];
+  if (!first) {
+    return undefined;
+  }
+
+  const currency = commerceCartItemCurrency(first);
+  return currency.length > 0 ? currency : undefined;
 }
 
 export interface CommerceContextValue {
@@ -553,8 +389,8 @@ export function CommerceProvider(props: CommerceProviderProps) {
   }, [syncCartSnapshot]);
 
   const removeFromCart = useCallback(async (itemId: string) => {
-    const previousItem = cart.find((entry) => entry.id === itemId);
-    setCart((current) => current.filter((entry) => entry.id !== itemId));
+    const previousItem = cart.find((entry) => commerceCartItemId(entry) === itemId);
+    setCart((current) => current.filter((entry) => commerceCartItemId(entry) !== itemId));
 
     try {
       const snapshot = await requestJson<CartSnapshotResponse>(
@@ -565,13 +401,16 @@ export function CommerceProvider(props: CommerceProviderProps) {
       );
       const nextCart = normalizeCartItems(snapshot.items);
       const nextCurrency = cartCurrencyFromItems(nextCart);
+      const previousProductId = previousItem ? commerceCartItemProductId(previousItem) : undefined;
+      const previousSku = previousItem ? commerceCartItemSku(previousItem) : undefined;
+      const previousTitle = previousItem ? commerceCartItemTitle(previousItem) : undefined;
       syncCartSnapshot(snapshot);
       emitCommerceEvent("cart_item_removed", {
         itemId,
-        ...(previousItem?.productId ? { productId: previousItem.productId } : {}),
-        ...(previousItem?.sku ? { sku: previousItem.sku } : {}),
-        ...(previousItem?.title ? { title: previousItem.title } : {}),
-        ...(typeof previousItem?.quantity === "number" ? { quantity: previousItem.quantity } : {}),
+        ...(typeof previousProductId === "string" ? { productId: previousProductId } : {}),
+        ...(typeof previousSku === "string" ? { sku: previousSku } : {}),
+        ...(typeof previousTitle === "string" ? { title: previousTitle } : {}),
+        ...(previousItem ? { quantity: commerceCartItemQuantity(previousItem) } : {}),
         ...(nextCart.length > 0 ? { cartCount: cartCountFromItems(nextCart) } : {}),
         ...(nextCart.length > 0 ? { cartSubtotal: cartSubtotalFromItems(nextCart) } : {}),
         ...(typeof nextCurrency === "string" ? { currency: nextCurrency } : {}),
@@ -584,7 +423,7 @@ export function CommerceProvider(props: CommerceProviderProps) {
   }, [cart, refreshCart, syncCartSnapshot]);
 
   const setCartQuantity = useCallback(async (itemId: string, quantity: number) => {
-    const previousItem = cart.find((entry) => entry.id === itemId);
+    const previousItem = cart.find((entry) => commerceCartItemId(entry) === itemId);
     const snapshot = await requestJson<CartSnapshotResponse>(`/api/commerce/cart/items/${encodeURIComponent(itemId)}`, {
       method: "PATCH",
       body: JSON.stringify({
@@ -593,12 +432,13 @@ export function CommerceProvider(props: CommerceProviderProps) {
     });
     const nextCart = normalizeCartItems(snapshot.items);
     const nextCurrency = cartCurrencyFromItems(nextCart);
+    const previousProductId = previousItem ? commerceCartItemProductId(previousItem) : undefined;
     syncCartSnapshot(snapshot);
     emitCommerceEvent("cart_item_quantity_updated", {
       itemId,
       quantity,
-      ...(previousItem?.productId ? { productId: previousItem.productId } : {}),
-      ...(typeof previousItem?.quantity === "number" ? { previousQuantity: previousItem.quantity } : {}),
+      ...(typeof previousProductId === "string" ? { productId: previousProductId } : {}),
+      ...(previousItem ? { previousQuantity: commerceCartItemQuantity(previousItem) } : {}),
       ...(nextCart.length > 0 ? { cartCount: cartCountFromItems(nextCart) } : {}),
       ...(nextCart.length > 0 ? { cartSubtotal: cartSubtotalFromItems(nextCart) } : {}),
       ...(typeof nextCurrency === "string" ? { currency: nextCurrency } : {}),
@@ -606,10 +446,17 @@ export function CommerceProvider(props: CommerceProviderProps) {
   }, [cart, syncCartSnapshot]);
 
   const clearCart = useCallback(async () => {
-    await Promise.all(cart.map((item) => requestJson<CartSnapshotResponse>(
-      `/api/commerce/cart/items/${encodeURIComponent(item.id)}`,
-      { method: "DELETE" },
-    )));
+    await Promise.all(cart.flatMap((item) => {
+      const itemId = commerceCartItemId(item);
+      if (itemId.length === 0) {
+        return [];
+      }
+
+      return [requestJson<CartSnapshotResponse>(
+        `/api/commerce/cart/items/${encodeURIComponent(itemId)}`,
+        { method: "DELETE" },
+      )];
+    }));
     await refreshCart();
   }, [cart, refreshCart]);
 
@@ -674,10 +521,10 @@ export function CommerceProvider(props: CommerceProviderProps) {
     const order = normalizeOrder(response.order);
     if (order) {
       emitCommerceEvent("checkout_completed", {
-        orderId: order.id,
+        orderId: commerceOrderId(order),
         ...(order.number ? { orderNumber: order.number } : {}),
-        ...(typeof order.total === "number" ? { total: order.total } : {}),
-        ...(order.currency ? { currency: order.currency } : {}),
+        total: commerceOrderTotal(order),
+        currency: commerceOrderCurrency(order),
       });
     }
 
@@ -689,10 +536,10 @@ export function CommerceProvider(props: CommerceProviderProps) {
     const order = normalizeOrder(response.order);
     if (order) {
       emitCommerceEvent("order_viewed", {
-        orderId: order.id,
+        orderId: commerceOrderId(order),
         ...(order.status ? { status: order.status } : {}),
-        ...(typeof order.total === "number" ? { total: order.total } : {}),
-        ...(order.currency ? { currency: order.currency } : {}),
+        total: commerceOrderTotal(order),
+        currency: commerceOrderCurrency(order),
       });
     }
 
@@ -712,11 +559,11 @@ export function CommerceProvider(props: CommerceProviderProps) {
   }, []);
 
   const cartCount = useMemo(() => {
-    return cart.reduce((sum, item) => sum + item.quantity, 0);
+    return cart.reduce((sum, item) => sum + commerceCartItemQuantity(item), 0);
   }, [cart]);
 
   const cartSubtotal = useMemo(() => {
-    return cart.reduce((sum, item) => sum + item.totalPrice, 0);
+    return cart.reduce((sum, item) => sum + commerceCartItemTotalPrice(item), 0);
   }, [cart]);
 
   const value = useMemo<CommerceContextValue>(() => ({

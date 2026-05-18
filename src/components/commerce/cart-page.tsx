@@ -5,6 +5,15 @@ import type { Route } from "next";
 import { useEffect, useRef, useState } from "react";
 
 import { useCommerce } from "@/components/commerce/commerce-provider";
+import {
+  commerceCartItemCurrency,
+  commerceCartItemId,
+  commerceCartItemProductId,
+  commerceCartItemQuantity,
+  commerceCartItemSku,
+  commerceCartItemTitle,
+  commerceCartItemUnitPrice,
+} from "@ominity/next/commerce";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,7 +49,7 @@ export function CommerceCartPage(props: CommerceCartPageProps) {
     emitCommerceEvent("cart_viewed", {
       cartCount: commerce.cartCount,
       cartSubtotal: commerce.cartSubtotal,
-      ...(commerce.cart[0]?.currency ? { currency: commerce.cart[0].currency } : {}),
+      ...(commerce.cart[0] ? { currency: commerceCartItemCurrency(commerce.cart[0]) } : {}),
       ...(commerce.promotionCodes.length > 0 ? { promotionCodes: commerce.promotionCodes } : {}),
     });
   }, [commerce.cart, commerce.cartCount, commerce.cartSubtotal, commerce.promotionCodes, commerce.ready]);
@@ -82,41 +91,49 @@ export function CommerceCartPage(props: CommerceCartPageProps) {
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
           <div className="space-y-4">
             {commerce.cart.map((item) => (
-              <Card key={item.id}>
+              <Card key={commerceCartItemId(item)}>
                 <CardHeader>
-                  <CardTitle className="text-lg">{item.title ?? item.sku ?? item.id}</CardTitle>
+                  <CardTitle className="text-lg">{commerceCartItemTitle(item)}</CardTitle>
                   <CardDescription>
-                    {typeof item.sku === "string" && item.sku.length > 0
-                      ? `SKU ${item.sku}`
-                      : typeof item.productId === "string"
-                        ? `Product ${item.productId}`
-                        : "Product"}
+                    {(() => {
+                      const sku = commerceCartItemSku(item);
+                      if (typeof sku === "string" && sku.length > 0) {
+                        return `SKU ${sku}`;
+                      }
+
+                      const productId = commerceCartItemProductId(item);
+                      if (typeof productId === "string") {
+                        return `Product ${productId}`;
+                      }
+
+                      return "Product";
+                    })()}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    {formatMoney(item.unitPrice, item.currency)} each
+                    {formatMoney(commerceCartItemUnitPrice(item), commerceCartItemCurrency(item))} each
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => { void commerce.setCartQuantity(item.id, item.quantity - 1); }}
+                      onClick={() => { void commerce.setCartQuantity(commerceCartItemId(item), commerceCartItemQuantity(item) - 1); }}
                     >
                       -1
                     </Button>
-                    <span className="text-sm">Qty {item.quantity}</span>
+                    <span className="text-sm">Qty {commerceCartItemQuantity(item)}</span>
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => { void commerce.setCartQuantity(item.id, item.quantity + 1); }}
+                      onClick={() => { void commerce.setCartQuantity(commerceCartItemId(item), commerceCartItemQuantity(item) + 1); }}
                     >
                       +1
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => { void commerce.removeFromCart(item.id); }}
+                      onClick={() => { void commerce.removeFromCart(commerceCartItemId(item)); }}
                     >
                       Remove
                     </Button>
@@ -179,7 +196,7 @@ export function CommerceCartPage(props: CommerceCartPageProps) {
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span>Subtotal</span>
-                <span>{formatMoney(commerce.cartSubtotal, commerce.cart[0]?.currency ?? "EUR")}</span>
+                <span>{formatMoney(commerce.cartSubtotal, commerce.cartCurrency ?? "EUR")}</span>
               </div>
               {props.features.checkout ? (
                 <Link href={checkoutPath as Route} className="inline-block text-sm font-medium text-primary hover:underline">
