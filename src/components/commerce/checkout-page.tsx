@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMoney } from "@/lib/ominity/commerce";
+import { emitCommerceEvent } from "@/lib/ominity/commerce/events";
 import { useAuth } from "@/components/auth";
 
 interface CheckoutAddressDraft {
@@ -62,6 +63,7 @@ export function CommerceCheckoutPage(props: CommerceCheckoutPageProps) {
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const hasEmittedCheckoutStarted = useRef(false);
 
   const hasSession = auth.session !== null;
   const checkoutBlockedByAuth = props.features.auth && !props.features.guestCheckout && !hasSession;
@@ -83,6 +85,29 @@ export function CommerceCheckoutPage(props: CommerceCheckoutPageProps) {
       setMode("authenticated");
     }
   }, [hasSession, props.features.auth]);
+
+  useEffect(() => {
+    if (!commerce.ready || !auth.ready || commerce.cart.length === 0 || hasEmittedCheckoutStarted.current) {
+      return;
+    }
+
+    hasEmittedCheckoutStarted.current = true;
+    emitCommerceEvent("checkout_started", {
+      mode: hasSession ? "authenticated" : "guest",
+      cartCount: commerce.cartCount,
+      cartSubtotal: commerce.cartSubtotal,
+      ...(commerce.cart[0]?.currency ? { currency: commerce.cart[0].currency } : {}),
+      ...(commerce.promotionCodes.length > 0 ? { promotionCodes: commerce.promotionCodes } : {}),
+    });
+  }, [
+    auth.ready,
+    commerce.cart,
+    commerce.cartCount,
+    commerce.cartSubtotal,
+    commerce.promotionCodes,
+    commerce.ready,
+    hasSession,
+  ]);
 
   if (!commerce.ready || !auth.ready) {
     return (

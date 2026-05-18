@@ -1,9 +1,8 @@
 import { getStarterOminityConfig } from "@/lib/ominity/env";
+import { getStarterCommerceClient } from "@/lib/ominity/server/commerce";
 import { jsonError } from "@/lib/ominity/server/http";
 import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { mockGetPayment } from "@/lib/ominity/server/mock-commerce";
-import { normalizePayment } from "@/lib/ominity/server/normalize";
-import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
 interface PaymentRouteProps {
   params: Promise<{
@@ -32,11 +31,16 @@ export async function GET(request: Request, context: PaymentRouteProps): Promise
 
   try {
     const language = await resolveRequestSdkLanguage(request);
-    const sdk = createApiKeySdk(language);
-    const payment = await sdk.commerce.payments.get(paymentId);
+    const client = getStarterCommerceClient(language);
+    const payment = await client.getPayment({
+      id: paymentId,
+    });
+    if (!payment) {
+      return jsonError(404, "PAYMENT_NOT_FOUND", "Payment was not found.");
+    }
 
     return Response.json({
-      payment: normalizePayment(payment),
+      payment,
     });
   } catch {
     return jsonError(404, "PAYMENT_NOT_FOUND", "Payment was not found.");

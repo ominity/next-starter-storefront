@@ -194,28 +194,57 @@ function normalizeLocalesFromChannel(channel: NormalizedStarterChannel): Readonl
     merged.set(locale.code, mergeLocale(merged.get(locale.code), locale));
   }
 
+  const combinedLanguageCodes = Array.from(new Set([
+    ...channel.languages
+      .map((language) => parseLocaleCode(normalizeLocaleCode(language.code)).language)
+      .filter((entry) => entry.length > 0),
+    ...channel.countries
+      .map((country) => country.language)
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => parseLocaleCode(normalizeLocaleCode(entry)).language)
+      .filter((entry) => entry.length > 0),
+    ...(channel.defaultLanguageCode
+      ? [parseLocaleCode(normalizeLocaleCode(channel.defaultLanguageCode)).language].filter((entry) => entry.length > 0)
+      : []),
+  ]));
+
   for (const country of channel.countries) {
-    const languageCode = country.language ?? channel.defaultLanguageCode;
-    if (!languageCode) {
-      continue;
+    const languageCodesForCountry = combinedLanguageCodes.length > 0
+      ? combinedLanguageCodes
+      : country.language
+        ? [parseLocaleCode(normalizeLocaleCode(country.language)).language].filter((entry) => entry.length > 0)
+        : [];
+
+    for (const languageCode of languageCodesForCountry) {
+      const parsedLanguage = parseLocaleCode(normalizeLocaleCode(languageCode));
+      if (parsedLanguage.language.length === 0) {
+        continue;
+      }
+
+      const localeCode = toLocaleCode({
+        language: parsedLanguage.language,
+        country: country.code,
+      });
+
+      const locale: CmsLocale = {
+        code: localeCode,
+        language: parsedLanguage.language,
+        country: country.code,
+      };
+      merged.set(locale.code, mergeLocale(merged.get(locale.code), locale));
     }
+  }
 
-    const parsedLanguage = parseLocaleCode(normalizeLocaleCode(languageCode));
-    if (parsedLanguage.language.length === 0) {
-      continue;
+  if (merged.size === 0 && channel.defaultLanguageCode) {
+    const fallbackLocaleCode = normalizeLocaleCode(channel.defaultLanguageCode);
+    const parsedFallback = parseLocaleCode(fallbackLocaleCode);
+    if (parsedFallback.language.length > 0) {
+      const fallbackLocale: CmsLocale = {
+        code: fallbackLocaleCode,
+        language: parsedFallback.language,
+      };
+      merged.set(fallbackLocale.code, fallbackLocale);
     }
-
-    const localeCode = toLocaleCode({
-      language: parsedLanguage.language,
-      country: country.code,
-    });
-
-    const locale: CmsLocale = {
-      code: localeCode,
-      language: parsedLanguage.language,
-      country: country.code,
-    };
-    merged.set(locale.code, mergeLocale(merged.get(locale.code), locale));
   }
 
   return Array.from(merged.values());

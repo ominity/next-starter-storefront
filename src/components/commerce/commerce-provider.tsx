@@ -1,6 +1,13 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import type {
+  CommerceCart as ApiCart,
+  CommerceCartItem as ApiCartItem,
+  CommerceOrder as ApiOrder,
+  CommercePayment as ApiPayment,
+} from "@ominity/next/commerce";
+import { emitCommerceEvent } from "@/lib/ominity/commerce/events";
 
 export interface CommerceCatalogProduct {
   readonly id: string;
@@ -56,43 +63,6 @@ const STORAGE_KEYS = {
   wishlist: "ominity-starter:commerce:wishlist",
 } as const;
 
-interface ApiMoney {
-  readonly value?: number;
-  readonly currency?: string;
-}
-
-interface ApiCartItem {
-  readonly id?: string;
-  readonly productId?: string;
-  readonly sku?: string;
-  readonly title?: string;
-  readonly quantity?: number;
-  readonly unitPrice?: ApiMoney;
-  readonly totalPrice?: ApiMoney;
-  readonly imageUrl?: string;
-}
-
-interface ApiCart {
-  readonly id?: string;
-  readonly country?: string;
-  readonly currency?: string;
-}
-
-interface ApiOrder {
-  readonly id?: string;
-  readonly status?: string;
-  readonly number?: string;
-  readonly createdAt?: string;
-  readonly totalAmount?: ApiMoney;
-}
-
-interface ApiPayment {
-  readonly id?: string;
-  readonly status?: string;
-  readonly createdAt?: string;
-  readonly amount?: ApiMoney;
-}
-
 interface CartSnapshotResponse {
   readonly cart?: ApiCart;
   readonly items?: ReadonlyArray<ApiCartItem>;
@@ -142,7 +112,68 @@ function asNumber(value: unknown): number | undefined {
     return value;
   }
 
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
   return undefined;
+}
+
+function asRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  return typeof value === "object" && value !== null
+    ? value as Readonly<Record<string, unknown>>
+    : undefined;
+}
+
+function asString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function toStringId(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `${Math.floor(value)}`;
+  }
+
+  return undefined;
+}
+
+function moneyValue(value: unknown): number | undefined {
+  const direct = asNumber(value);
+  if (typeof direct === "number") {
+    return direct;
+  }
+
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  return asNumber(record.value)
+    ?? asNumber(record.amount)
+    ?? asNumber(record.gross)
+    ?? asNumber(record.price);
+}
+
+function moneyCurrency(value: unknown): string | undefined {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  return asString(record.currency) ?? asString(record.currencyCode);
 }
 
 function requestHeaders(init?: HeadersInit): HeadersInit {
@@ -182,47 +213,110 @@ function normalizeCartItems(items: ReadonlyArray<ApiCartItem> | undefined): Read
   }
 
   return items.flatMap((entry): CommerceCartItem[] => {
-    const id = typeof entry.id === "string" ? entry.id : "";
+    const record = asRecord(entry);
+    if (!record) {
+      return [];
+    }
+
+    const id = toStringId(record.id) ?? "";
     if (id.length === 0) {
       return [];
     }
 
-    const quantity = asNumber(entry.quantity) ?? 1;
-    const unitPrice = asNumber(entry.unitPrice?.value) ?? 0;
-    const totalPrice = asNumber(entry.totalPrice?.value) ?? unitPrice * quantity;
-    const currency = typeof entry.unitPrice?.currency === "string" && entry.unitPrice.currency.length > 0
-      ? entry.unitPrice.currency
-      : typeof entry.totalPrice?.currency === "string" && entry.totalPrice.currency.length > 0
-        ? entry.totalPrice.currency
-        : "EUR";
+    const embedded = asRecord(record._embedded);
+    const product = asRecord(record.product) ?? asRecord(embedded?.product);
+    const offer = asRecord(record.offer) ?? asRecord(embedded?.offer);
+    const quantity = asNumber(record.quantity) ?? 1;
+    const unitPrice = moneyValue(record.unitPrice)
+      ?? moneyValue(record.unitAmount)
+      ?? moneyValue(record.price)
+      ?? moneyValue(offer?.unitPrice)
+      ?? moneyValue(offer?.unitAmount)
+      ?? moneyValue(offer?.amount)
+      ?? 0;
+    const totalPrice = moneyValue(record.totalPrice)
+      ?? moneyValue(record.totalAmount)
+      ?? moneyValue(record.total)
+      ?? moneyValue(offer?.totalPrice)
+      ?? moneyValue(offer?.totalAmount)
+      ?? moneyValue(offer?.amount)
+      ?? unitPrice * quantity;
+    const currency = moneyCurrency(record.unitPrice)
+      ?? moneyCurrency(record.unitAmount)
+      ?? moneyCurrency(record.totalPrice)
+      ?? moneyCurrency(record.totalAmount)
+      ?? moneyCurrency(offer?.unitPrice)
+      ?? moneyCurrency(offer?.unitAmount)
+      ?? moneyCurrency(offer?.amount)
+      ?? asString(record.currency)
+      ?? asString(product?.currency)
+      ?? "EUR";
+    const productId = record.productId ?? record.product_id ?? product?.id;
+    const sku = asString(record.sku) ?? asString(product?.sku);
+    const title = asString(record.title)
+      ?? asString(record.name)
+      ?? asString(product?.title)
+      ?? asString(product?.shortTitle);
+    const additionalImages = Array.isArray(product?.additionalImages)
+      ? product.additionalImages
+      : [];
+    const firstAdditionalImage = additionalImages.find((value) => {
+      return typeof value === "string" && value.trim().length > 0;
+    });
+    const imageUrl = asString(record.imageUrl)
+      ?? asString(product?.coverImage)
+      ?? (typeof firstAdditionalImage === "string" ? firstAdditionalImage : undefined);
 
     return [{
       id,
-      ...(typeof entry.productId === "string" ? { productId: entry.productId } : {}),
-      ...(typeof entry.sku === "string" ? { sku: entry.sku } : {}),
-      ...(typeof entry.title === "string" ? { title: entry.title } : {}),
+      ...(typeof productId === "string"
+        ? { productId }
+        : typeof productId === "number" && Number.isFinite(productId)
+          ? { productId: `${productId}` }
+          : {}),
+      ...(typeof sku === "string" ? { sku } : {}),
+      ...(typeof title === "string" ? { title } : {}),
       quantity: quantity > 0 ? Math.floor(quantity) : 1,
       unitPrice,
       totalPrice,
-      currency,
-      ...(typeof entry.imageUrl === "string" ? { imageUrl: entry.imageUrl } : {}),
+      currency: currency.toUpperCase(),
+      ...(typeof imageUrl === "string" ? { imageUrl } : {}),
     }];
   });
 }
 
+function normalizePromotionCodes(value: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const entries = value.flatMap((entry) => {
+    if (typeof entry !== "string") {
+      return [];
+    }
+
+    const trimmed = entry.trim();
+    return trimmed.length > 0 ? [trimmed] : [];
+  });
+
+  return Array.from(new Set(entries));
+}
+
 
 function normalizeOrder(order: ApiOrder | undefined): CommerceOrder | null {
-  if (!order || typeof order.id !== "string" || order.id.length === 0) {
+  if (!order) {
+    return null;
+  }
+  const id = toStringId((order as unknown as { id?: unknown }).id) ?? "";
+  if (id.length === 0) {
     return null;
   }
 
-  const total = asNumber(order.totalAmount?.value) ?? 0;
-  const currency = typeof order.totalAmount?.currency === "string" && order.totalAmount.currency.length > 0
-    ? order.totalAmount.currency
-    : "EUR";
+  const total = moneyValue(order.totalAmount) ?? 0;
+  const currency = (moneyCurrency(order.totalAmount) ?? "EUR").toUpperCase();
 
   return {
-    id: order.id,
+    id,
     status: typeof order.status === "string" ? order.status : "unknown",
     ...(typeof order.number === "string" ? { number: order.number } : {}),
     ...(typeof order.createdAt === "string" ? { createdAt: order.createdAt } : {}),
@@ -237,7 +331,7 @@ function normalizePayments(items: ReadonlyArray<ApiPayment> | undefined): Readon
   }
 
   return items.flatMap((entry): CommercePayment[] => {
-    const id = typeof entry.id === "string" ? entry.id : "";
+    const id = toStringId((entry as unknown as { id?: unknown }).id) ?? "";
     if (id.length === 0) {
       return [];
     }
@@ -245,10 +339,8 @@ function normalizePayments(items: ReadonlyArray<ApiPayment> | undefined): Readon
     return [{
       id,
       status: typeof entry.status === "string" ? entry.status : "unknown",
-      amount: asNumber(entry.amount?.value) ?? 0,
-      currency: typeof entry.amount?.currency === "string" && entry.amount.currency.length > 0
-        ? entry.amount.currency
-        : "EUR",
+      amount: moneyValue(entry.amount) ?? 0,
+      currency: (moneyCurrency(entry.amount) ?? "EUR").toUpperCase(),
       ...(typeof entry.createdAt === "string" ? { createdAt: entry.createdAt } : {}),
     }];
   });
@@ -283,16 +375,32 @@ function splitFullName(fullName: string | undefined): { firstName?: string; last
   };
 }
 
+function cartCountFromItems(items: ReadonlyArray<CommerceCartItem>): number {
+  return items.reduce((sum, item) => sum + item.quantity, 0);
+}
+
+function cartSubtotalFromItems(items: ReadonlyArray<CommerceCartItem>): number {
+  return items.reduce((sum, item) => sum + item.totalPrice, 0);
+}
+
+function cartCurrencyFromItems(items: ReadonlyArray<CommerceCartItem>): string | undefined {
+  const currency = items[0]?.currency;
+  return typeof currency === "string" && currency.length > 0 ? currency : undefined;
+}
+
 export interface CommerceContextValue {
   readonly ready: boolean;
   readonly cart: ReadonlyArray<CommerceCartItem>;
   readonly cartCountry: string | undefined;
   readonly cartCurrency: string | undefined;
+  readonly promotionCodes: ReadonlyArray<string>;
   readonly wishlist: ReadonlyArray<CommerceWishlistItem>;
   readonly cartCount: number;
   readonly cartSubtotal: number;
   refreshCart(): Promise<void>;
   setCartCountry(country: string): Promise<void>;
+  applyPromotionCode(code: string): Promise<void>;
+  removePromotionCode(code: string): Promise<void>;
   addToCart(product: CommerceCatalogProduct, quantity?: number): Promise<void>;
   removeFromCart(itemId: string): Promise<void>;
   setCartQuantity(itemId: string, quantity: number): Promise<void>;
@@ -316,14 +424,20 @@ export function CommerceProvider(props: CommerceProviderProps) {
   const [cart, setCart] = useState<ReadonlyArray<CommerceCartItem>>([]);
   const [cartCountry, setCartCountryState] = useState<string | undefined>();
   const [cartCurrency, setCartCurrencyState] = useState<string | undefined>();
+  const [promotionCodes, setPromotionCodes] = useState<ReadonlyArray<string>>([]);
   const [wishlist, setWishlist] = useState<ReadonlyArray<CommerceWishlistItem>>([]);
+
+  const syncCartSnapshot = useCallback((snapshot: CartSnapshotResponse) => {
+    setCart(normalizeCartItems(snapshot.items));
+    setCartCountryState(typeof snapshot.cart?.country === "string" ? snapshot.cart.country.toUpperCase() : undefined);
+    setCartCurrencyState(typeof snapshot.cart?.currency === "string" ? snapshot.cart.currency.toUpperCase() : undefined);
+    setPromotionCodes(normalizePromotionCodes(snapshot.cart?.promotionCodes));
+  }, []);
 
   const refreshCart = useCallback(async () => {
     const response = await requestJson<CartSnapshotResponse>("/api/commerce/cart");
-    setCart(normalizeCartItems(response.items));
-    setCartCountryState(typeof response.cart?.country === "string" ? response.cart.country.toUpperCase() : undefined);
-    setCartCurrencyState(typeof response.cart?.currency === "string" ? response.cart.currency.toUpperCase() : undefined);
-  }, []);
+    syncCartSnapshot(response);
+  }, [syncCartSnapshot]);
 
   const setCartCountry = useCallback(async (country: string) => {
     const normalizedCountry = country.trim().toUpperCase();
@@ -334,16 +448,53 @@ export function CommerceProvider(props: CommerceProviderProps) {
     const response = await requestJson<CartSnapshotResponse>("/api/commerce/cart", {
       method: "PATCH",
       body: JSON.stringify({
-        data: {
-          country: normalizedCountry,
-        },
+        country: normalizedCountry,
       }),
     });
 
-    setCart(normalizeCartItems(response.items));
+    syncCartSnapshot(response);
     setCartCountryState(typeof response.cart?.country === "string" ? response.cart.country.toUpperCase() : normalizedCountry);
-    setCartCurrencyState(typeof response.cart?.currency === "string" ? response.cart.currency.toUpperCase() : undefined);
-  }, []);
+  }, [syncCartSnapshot]);
+
+  const applyPromotionCode = useCallback(async (code: string) => {
+    const normalizedCode = code.trim();
+    if (normalizedCode.length === 0) {
+      return;
+    }
+
+    const nextCodes = Array.from(new Set([...promotionCodes, normalizedCode]));
+    const response = await requestJson<CartSnapshotResponse>("/api/commerce/cart", {
+      method: "PATCH",
+      body: JSON.stringify({
+        promotionCodes: nextCodes,
+      }),
+    });
+
+    syncCartSnapshot(response);
+    const resolvedCodes = normalizePromotionCodes(response.cart?.promotionCodes);
+    emitCommerceEvent("promotion_code_applied", {
+      code: normalizedCode,
+      promotionCodes: resolvedCodes,
+    });
+  }, [promotionCodes, syncCartSnapshot]);
+
+  const removePromotionCode = useCallback(async (code: string) => {
+    const normalizedCode = code.trim();
+    const nextCodes = promotionCodes.filter((entry) => entry !== normalizedCode);
+    const response = await requestJson<CartSnapshotResponse>("/api/commerce/cart", {
+      method: "PATCH",
+      body: JSON.stringify({
+        promotionCodes: nextCodes,
+      }),
+    });
+
+    syncCartSnapshot(response);
+    const resolvedCodes = normalizePromotionCodes(response.cart?.promotionCodes);
+    emitCommerceEvent("promotion_code_removed", {
+      code: normalizedCode,
+      promotionCodes: resolvedCodes,
+    });
+  }, [promotionCodes, syncCartSnapshot]);
 
   useEffect(() => {
     setWishlist(readStorage<ReadonlyArray<CommerceWishlistItem>>(STORAGE_KEYS.wishlist, []));
@@ -353,6 +504,9 @@ export function CommerceProvider(props: CommerceProviderProps) {
         await refreshCart();
       } catch {
         setCart([]);
+        setCartCountryState(undefined);
+        setCartCurrencyState(undefined);
+        setPromotionCodes([]);
       } finally {
         setReady(true);
       }
@@ -384,31 +538,72 @@ export function CommerceProvider(props: CommerceProviderProps) {
       }),
     });
 
-    setCart(normalizeCartItems(snapshot.items));
-    setCartCountryState(typeof snapshot.cart?.country === "string" ? snapshot.cart.country.toUpperCase() : undefined);
-    setCartCurrencyState(typeof snapshot.cart?.currency === "string" ? snapshot.cart.currency.toUpperCase() : undefined);
-  }, []);
+    const nextCart = normalizeCartItems(snapshot.items);
+    const nextCurrency = cartCurrencyFromItems(nextCart);
+    syncCartSnapshot(snapshot);
+    emitCommerceEvent("cart_item_added", {
+      productId: product.id,
+      quantity: normalizedQuantity,
+      ...(typeof product.sku === "string" ? { sku: product.sku } : {}),
+      ...(typeof product.title === "string" ? { title: product.title } : {}),
+      ...(nextCart.length > 0 ? { cartCount: cartCountFromItems(nextCart) } : {}),
+      ...(nextCart.length > 0 ? { cartSubtotal: cartSubtotalFromItems(nextCart) } : {}),
+      ...(typeof nextCurrency === "string" ? { currency: nextCurrency } : {}),
+    });
+  }, [syncCartSnapshot]);
 
   const removeFromCart = useCallback(async (itemId: string) => {
-    const snapshot = await requestJson<CartSnapshotResponse>(`/api/commerce/cart/items/${encodeURIComponent(itemId)}`, {
-      method: "DELETE",
-    });
-    setCart(normalizeCartItems(snapshot.items));
-    setCartCountryState(typeof snapshot.cart?.country === "string" ? snapshot.cart.country.toUpperCase() : undefined);
-    setCartCurrencyState(typeof snapshot.cart?.currency === "string" ? snapshot.cart.currency.toUpperCase() : undefined);
-  }, []);
+    const previousItem = cart.find((entry) => entry.id === itemId);
+    setCart((current) => current.filter((entry) => entry.id !== itemId));
+
+    try {
+      const snapshot = await requestJson<CartSnapshotResponse>(
+        `/api/commerce/cart/items/${encodeURIComponent(itemId)}`,
+        {
+          method: "DELETE",
+        },
+      );
+      const nextCart = normalizeCartItems(snapshot.items);
+      const nextCurrency = cartCurrencyFromItems(nextCart);
+      syncCartSnapshot(snapshot);
+      emitCommerceEvent("cart_item_removed", {
+        itemId,
+        ...(previousItem?.productId ? { productId: previousItem.productId } : {}),
+        ...(previousItem?.sku ? { sku: previousItem.sku } : {}),
+        ...(previousItem?.title ? { title: previousItem.title } : {}),
+        ...(typeof previousItem?.quantity === "number" ? { quantity: previousItem.quantity } : {}),
+        ...(nextCart.length > 0 ? { cartCount: cartCountFromItems(nextCart) } : {}),
+        ...(nextCart.length > 0 ? { cartSubtotal: cartSubtotalFromItems(nextCart) } : {}),
+        ...(typeof nextCurrency === "string" ? { currency: nextCurrency } : {}),
+      });
+    } finally {
+      try {
+        await refreshCart();
+      } catch {}
+    }
+  }, [cart, refreshCart, syncCartSnapshot]);
 
   const setCartQuantity = useCallback(async (itemId: string, quantity: number) => {
+    const previousItem = cart.find((entry) => entry.id === itemId);
     const snapshot = await requestJson<CartSnapshotResponse>(`/api/commerce/cart/items/${encodeURIComponent(itemId)}`, {
       method: "PATCH",
       body: JSON.stringify({
         quantity,
       }),
     });
-    setCart(normalizeCartItems(snapshot.items));
-    setCartCountryState(typeof snapshot.cart?.country === "string" ? snapshot.cart.country.toUpperCase() : undefined);
-    setCartCurrencyState(typeof snapshot.cart?.currency === "string" ? snapshot.cart.currency.toUpperCase() : undefined);
-  }, []);
+    const nextCart = normalizeCartItems(snapshot.items);
+    const nextCurrency = cartCurrencyFromItems(nextCart);
+    syncCartSnapshot(snapshot);
+    emitCommerceEvent("cart_item_quantity_updated", {
+      itemId,
+      quantity,
+      ...(previousItem?.productId ? { productId: previousItem.productId } : {}),
+      ...(typeof previousItem?.quantity === "number" ? { previousQuantity: previousItem.quantity } : {}),
+      ...(nextCart.length > 0 ? { cartCount: cartCountFromItems(nextCart) } : {}),
+      ...(nextCart.length > 0 ? { cartSubtotal: cartSubtotalFromItems(nextCart) } : {}),
+      ...(typeof nextCurrency === "string" ? { currency: nextCurrency } : {}),
+    });
+  }, [cart, syncCartSnapshot]);
 
   const clearCart = useCallback(async () => {
     await Promise.all(cart.map((item) => requestJson<CartSnapshotResponse>(
@@ -419,18 +614,30 @@ export function CommerceProvider(props: CommerceProviderProps) {
   }, [cart, refreshCart]);
 
   const toggleWishlist = useCallback((product: CommerceCatalogProduct) => {
-    setWishlist((previous) => {
-      const exists = previous.some((item) => item.id === product.id);
-      if (exists) {
-        return previous.filter((item) => item.id !== product.id);
-      }
+    const exists = wishlist.some((item) => item.id === product.id);
+    if (exists) {
+      setWishlist((previous) => previous.filter((item) => item.id !== product.id));
+      emitCommerceEvent("wishlist_item_removed", {
+        productId: product.id,
+      });
+      return;
+    }
 
-      return [...previous, product];
+    setWishlist((previous) => [...previous, product]);
+    emitCommerceEvent("wishlist_item_added", {
+      productId: product.id,
+      ...(product.sku ? { sku: product.sku } : {}),
+      ...(product.title ? { title: product.title } : {}),
+      ...(typeof product.unitPrice === "number" ? { unitPrice: product.unitPrice } : {}),
+      ...(product.currency ? { currency: product.currency } : {}),
     });
-  }, []);
+  }, [wishlist]);
 
   const removeFromWishlist = useCallback((productId: string) => {
     setWishlist((previous) => previous.filter((item) => item.id !== productId));
+    emitCommerceEvent("wishlist_item_removed", {
+      productId,
+    });
   }, []);
 
   const isWishlisted = useCallback((productId: string) => {
@@ -464,19 +671,44 @@ export function CommerceProvider(props: CommerceProviderProps) {
     });
 
     await refreshCart();
-    return normalizeOrder(response.order);
+    const order = normalizeOrder(response.order);
+    if (order) {
+      emitCommerceEvent("checkout_completed", {
+        orderId: order.id,
+        ...(order.number ? { orderNumber: order.number } : {}),
+        ...(typeof order.total === "number" ? { total: order.total } : {}),
+        ...(order.currency ? { currency: order.currency } : {}),
+      });
+    }
+
+    return order;
   }, [refreshCart]);
 
   const getOrderById = useCallback(async (orderId: string) => {
     const response = await requestJson<OrderResponse>(`/api/commerce/orders/${encodeURIComponent(orderId)}`);
-    return normalizeOrder(response.order);
+    const order = normalizeOrder(response.order);
+    if (order) {
+      emitCommerceEvent("order_viewed", {
+        orderId: order.id,
+        ...(order.status ? { status: order.status } : {}),
+        ...(typeof order.total === "number" ? { total: order.total } : {}),
+        ...(order.currency ? { currency: order.currency } : {}),
+      });
+    }
+
+    return order;
   }, []);
 
   const listOrderPayments = useCallback(async (orderId: string) => {
     const response = await requestJson<OrderPaymentsResponse>(
       `/api/commerce/orders/${encodeURIComponent(orderId)}/payments`,
     );
-    return normalizePayments(response.items);
+    const payments = normalizePayments(response.items);
+    emitCommerceEvent("order_payments_viewed", {
+      orderId,
+      paymentsCount: payments.length,
+    });
+    return payments;
   }, []);
 
   const cartCount = useMemo(() => {
@@ -492,11 +724,14 @@ export function CommerceProvider(props: CommerceProviderProps) {
     cart,
     cartCountry,
     cartCurrency,
+    promotionCodes,
     wishlist,
     cartCount,
     cartSubtotal,
     refreshCart,
     setCartCountry,
+    applyPromotionCode,
+    removePromotionCode,
     addToCart,
     removeFromCart,
     setCartQuantity,
@@ -512,11 +747,14 @@ export function CommerceProvider(props: CommerceProviderProps) {
     cart,
     cartCountry,
     cartCurrency,
+    promotionCodes,
     wishlist,
     cartCount,
     cartSubtotal,
     refreshCart,
     setCartCountry,
+    applyPromotionCode,
+    removePromotionCode,
     addToCart,
     removeFromCart,
     setCartQuantity,

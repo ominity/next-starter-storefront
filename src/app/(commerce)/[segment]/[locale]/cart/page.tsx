@@ -73,6 +73,7 @@ export default async function CartPageRoute({ params }: CartPageProps) {
       features={{
         checkout: config.enableCommerceCheckout,
         auth: config.enableAuth,
+        guestCheckout: config.checkoutAllowGuest,
       }}
     />
   );

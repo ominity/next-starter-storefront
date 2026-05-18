@@ -1,7 +1,11 @@
 import { cookies } from "next/headers";
 
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { getOrCreateCartSnapshot } from "@/lib/ominity/server/commerce";
+import {
+  deleteCartItemSnapshot,
+  setCartItemQuantitySnapshot,
+  updateCartItemSnapshot,
+} from "@/lib/ominity/server/commerce";
 import { isRecord, jsonError, parseJsonBody } from "@/lib/ominity/server/http";
 import { resolveRequestCountry, resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import {
@@ -9,7 +13,6 @@ import {
   mockGetOrCreateCart,
   mockUpdateCartItem,
 } from "@/lib/ominity/server/mock-commerce";
-import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
 interface CartItemRouteProps {
   params: Promise<{
@@ -87,20 +90,21 @@ export async function PATCH(request: Request, context: CartItemRouteProps): Prom
     const language = await resolveRequestSdkLanguage(request);
     const country = await resolveRequestCountry(request);
     const createCartData = country ? { country } : {};
-    const snapshot = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
-    const sdk = createApiKeySdk(language);
-
-    if (quantity !== null) {
-      if (quantity <= 0) {
-        await sdk.commerce.cartItems.delete(snapshot.cart.id, itemId);
-      } else {
-        await sdk.commerce.cartItems.update(snapshot.cart.id, itemId, { quantity });
-      }
-    } else {
-      await sdk.commerce.cartItems.update(snapshot.cart.id, itemId, payload.data as Record<string, any>);
-    }
-
-    const refreshed = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
+    const refreshed = quantity !== null
+      ? await setCartItemQuantitySnapshot(
+        cookieStore,
+        itemId,
+        quantity,
+        createCartData,
+        language,
+      )
+      : await updateCartItemSnapshot(
+        cookieStore,
+        itemId,
+        payload.data as Record<string, unknown>,
+        createCartData,
+        language,
+      );
     return Response.json(refreshed);
   } catch (error) {
     return jsonError(500, "CART_ITEM_UPDATE_FAILED", "Failed to update cart item.", {
@@ -143,11 +147,12 @@ export async function DELETE(request: Request, context: CartItemRouteProps): Pro
     const language = await resolveRequestSdkLanguage(request);
     const country = await resolveRequestCountry(request);
     const createCartData = country ? { country } : {};
-    const snapshot = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
-    const sdk = createApiKeySdk(language);
-    await sdk.commerce.cartItems.delete(snapshot.cart.id, itemId);
-    const refreshed = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
-
+    const refreshed = await deleteCartItemSnapshot(
+      cookieStore,
+      itemId,
+      createCartData,
+      language,
+    );
     return Response.json(refreshed);
   } catch (error) {
     return jsonError(500, "CART_ITEM_DELETE_FAILED", "Failed to delete cart item.", {

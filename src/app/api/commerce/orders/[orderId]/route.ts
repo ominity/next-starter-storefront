@@ -1,9 +1,8 @@
 import { getStarterOminityConfig } from "@/lib/ominity/env";
+import { getStarterCommerceClient } from "@/lib/ominity/server/commerce";
 import { jsonError } from "@/lib/ominity/server/http";
 import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { mockGetOrder } from "@/lib/ominity/server/mock-commerce";
-import { normalizeOrder } from "@/lib/ominity/server/normalize";
-import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
 interface OrderRouteProps {
   params: Promise<{
@@ -32,11 +31,16 @@ export async function GET(request: Request, context: OrderRouteProps): Promise<R
 
   try {
     const language = await resolveRequestSdkLanguage(request);
-    const sdk = createApiKeySdk(language);
-    const order = await sdk.commerce.orders.get(orderId);
+    const client = getStarterCommerceClient(language);
+    const order = await client.getOrder({
+      id: orderId,
+    });
+    if (!order) {
+      return jsonError(404, "ORDER_NOT_FOUND", "Order was not found.");
+    }
 
     return Response.json({
-      order: normalizeOrder(order),
+      order,
     });
   } catch {
     return jsonError(404, "ORDER_NOT_FOUND", "Order was not found.");

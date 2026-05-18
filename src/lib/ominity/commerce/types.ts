@@ -3,6 +3,39 @@ import type { StarterLocaleVariant } from "@/lib/ominity/locale-variant";
 
 export type CommerceLocaleVariant = StarterLocaleVariant;
 
+export interface StarterCommerceOfferPrice {
+  readonly amount: number;
+  readonly formatted?: string;
+}
+
+export interface StarterCommerceProductOfferRecord {
+  readonly id: string;
+  readonly numericId?: number;
+  readonly type?: string;
+  readonly quantity?: number;
+  readonly intervalId?: number | null;
+  readonly prices: Readonly<Record<string, StarterCommerceOfferPrice>>;
+}
+
+export interface StarterCommerceProductCategoryRecord {
+  readonly id: string;
+  readonly numericId?: number;
+  readonly name?: string;
+  readonly slug?: string;
+  readonly fullSlug?: string;
+}
+
+export interface StarterCommerceProductGroupRecord {
+  readonly id: string;
+  readonly numericId?: number;
+  readonly name?: string;
+  readonly slug?: string;
+  readonly displayType?: string;
+  readonly image?: string;
+  readonly color?: string;
+  readonly label?: string;
+}
+
 export interface StarterCommerceProductRecord {
   readonly id: string;
   readonly numericId?: number;
@@ -15,7 +48,10 @@ export interface StarterCommerceProductRecord {
   readonly coverImage?: string;
   readonly stock?: number;
   readonly categoryId?: number;
+  readonly category?: StarterCommerceProductCategoryRecord;
   readonly categorySlugs?: Readonly<Record<string, string>>;
+  readonly offers?: ReadonlyArray<StarterCommerceProductOfferRecord>;
+  readonly groups?: ReadonlyArray<StarterCommerceProductGroupRecord>;
   readonly routes: Readonly<Record<string, CmsRouteObject>>;
 }
 

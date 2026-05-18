@@ -65,8 +65,8 @@ Secrets stay backend-only (Formspree-style) and should not be configured in the 
 | Variable | Purpose | Default |
 |---|---|---|
 | `OMINITY_FEATURE_COMMERCE` | Master switch for all commerce routes | `true` |
-| `OMINITY_FEATURE_COMMERCE_PRODUCTS` | Enable product routes (`/p/...`) | `true` |
-| `OMINITY_FEATURE_COMMERCE_CATEGORIES` | Enable category routes (`/c/...`) | `true` |
+| `OMINITY_FEATURE_COMMERCE_PRODUCTS` | Enable product routes (template from `src/locales/routes/commerce/*.json`, e.g. `product: "p/{sku}-{slug}"`) | `true` |
+| `OMINITY_FEATURE_COMMERCE_CATEGORIES` | Enable category routes (template from `src/locales/routes/commerce/*.json`, e.g. `category: "c/{slug}"`) | `true` |
 | `OMINITY_FEATURE_CART` | Enable cart module routes and UI actions | `true` |
 | `OMINITY_FEATURE_WISHLIST` | Enable wishlist module routes and UI actions | `true` |
 | `OMINITY_FEATURE_CHECKOUT` | Enable checkout module routes and UI actions | `true` |

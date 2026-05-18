@@ -1,12 +1,26 @@
-import { getStarterOminityConfig } from "@/lib/ominity/env";
+import type { OminityOptions } from "@ominity/api-typescript";
+import { normalizeLocaleCode, parseLocaleCode } from "@ominity/next/cms";
 import {
-  normalizeCart,
-  normalizeCartItemsFromCart,
-  type StarterApiCart,
-  type StarterApiCartItem,
-} from "@/lib/ominity/server/normalize";
-import { createApiKeySdk } from "@/lib/ominity/server/sdk";
-import { ResponseValidationError } from "@ominity/api-typescript/models/errors";
+  createCommerceClient,
+  type CommerceCart,
+  type CommerceCartItem,
+  type CommerceClient,
+} from "@ominity/next/commerce";
+import {
+  clearCartIdCookie,
+  createCommerceCartItemAndRefresh,
+  deleteCommerceCartItemAndRefresh,
+  getOrCreateCommerceCartSnapshot,
+  refreshCommerceCartSnapshot,
+  setCommerceCartItemQuantityAndRefresh,
+  updateCommerceCartAndRefresh,
+  updateCommerceCartItemAndRefresh,
+  type CartCookieOptions,
+} from "@ominity/next/next";
+
+import { getStarterChannelContext } from "@/lib/ominity/channel-context";
+import { getStarterOminityConfig } from "@/lib/ominity/env";
+import { getOminityDebugHttpClient } from "@/lib/ominity/server/sdk-debug-fetcher";
 
 export interface StarterCookieValue {
   readonly value: string;
@@ -26,111 +40,143 @@ export interface StarterCookieStore {
 }
 
 export interface StarterCartSnapshot {
-  readonly cart: StarterApiCart;
-  readonly items: ReadonlyArray<StarterApiCartItem>;
+  readonly cart: CommerceCart;
+  readonly items: ReadonlyArray<CommerceCartItem>;
   readonly created: boolean;
 }
 
-const CART_RELATIONS_INCLUDE = "items,items.product,items.offer,shippingMethod";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+interface StarterBaseCartInput {
+  readonly cookiesStore: StarterCookieStore;
+  readonly createCartData?: Readonly<Record<string, unknown>>;
+  readonly language?: string;
 }
 
-function recoverCartFromValidationError(error: unknown): Record<string, unknown> | null {
-  if (!(error instanceof ResponseValidationError)) {
-    return null;
-  }
+const CART_INCLUDE = "shippingMethod";
+const CART_ITEMS_INCLUDE = "product,offer";
 
-  if (error.statusCode < 200 || error.statusCode >= 300) {
-    return null;
-  }
+const commerceClientByLanguage = new Map<string, CommerceClient>();
 
-  if (!isRecord(error.rawValue)) {
-    return null;
-  }
-
-  const payload = error.rawValue;
-  const resource = typeof payload.resource === "string" ? payload.resource : "";
-  const id = payload.id;
-  const hasId = (typeof id === "string" && id.length > 0)
-    || (typeof id === "number" && Number.isFinite(id));
-
-  if (resource !== "cart" || !hasId) {
-    return null;
-  }
-
-  return payload;
-}
-
-function cartIdFromCookie(cookiesStore: StarterCookieStore): string | null {
+function cartCookieOptions(): CartCookieOptions {
   const config = getStarterOminityConfig();
-  const value = cookiesStore.get(config.cartCookieName)?.value;
-  if (!value) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function writeCartIdCookie(cookiesStore: StarterCookieStore, cartId: string): void {
-  const config = getStarterOminityConfig();
-  cookiesStore.set(config.cartCookieName, cartId, {
+  return {
+    name: config.cartCookieName,
     path: "/",
-    maxAge: config.cartCookieMaxAgeSeconds,
+    maxAgeSeconds: config.cartCookieMaxAgeSeconds,
     httpOnly: true,
     secure: config.nodeEnv === "production",
     sameSite: "lax",
+  };
+}
+
+function sdkOptions(language?: string): OminityOptions {
+  const config = getStarterOminityConfig();
+  if (!config.apiUrl) {
+    throw new Error("OMINITY_API_URL is required.");
+  }
+  if (!config.apiKey) {
+    throw new Error("OMINITY_API_KEY is required.");
+  }
+
+  const debugHttpClient = getOminityDebugHttpClient("sdk");
+  return {
+    serverURL: config.apiUrl,
+    security: {
+      apiKey: config.apiKey,
+    },
+    ...(debugHttpClient ? { httpClient: debugHttpClient } : {}),
+    ...(typeof language === "string" && language.length > 0 ? { language } : {}),
+    ...(typeof config.channelId === "string" ? { channelId: config.channelId } : {}),
+  };
+}
+
+function languageClientKey(language?: string): string {
+  if (typeof language !== "string") {
+    return "__default__";
+  }
+
+  const normalized = language.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : "__default__";
+}
+
+export function getStarterCommerceClient(language?: string): CommerceClient {
+  const key = languageClientKey(language);
+  const cached = commerceClientByLanguage.get(key);
+  if (cached) {
+    return cached;
+  }
+
+  const client = createCommerceClient({
+    sdk: sdkOptions(language),
   });
+  commerceClientByLanguage.set(key, client);
+  return client;
+}
+
+function asValidCountry(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : undefined;
+}
+
+async function resolveCreateCartCountryFallback(
+  createCartData: Readonly<Record<string, unknown>>,
+): Promise<string | undefined> {
+  const fromPayload = asValidCountry(createCartData.country);
+  if (fromPayload) {
+    return fromPayload;
+  }
+
+  const channelContext = await getStarterChannelContext();
+  const fromDefaultCountry = asValidCountry(channelContext.defaultCountry);
+  if (fromDefaultCountry) {
+    return fromDefaultCountry;
+  }
+
+  const defaultLocaleCountry = parseLocaleCode(normalizeLocaleCode(channelContext.defaultLocale)).country;
+  const fromDefaultLocale = asValidCountry(defaultLocaleCountry);
+  if (fromDefaultLocale) {
+    return fromDefaultLocale;
+  }
+
+  for (const country of channelContext.countries) {
+    const candidate = asValidCountry(country);
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+async function resolvedCreateCartData(
+  createCartData: Readonly<Record<string, unknown>>,
+): Promise<Readonly<Record<string, unknown>>> {
+  const createCountry = await resolveCreateCartCountryFallback(createCartData);
+  if (!createCountry) {
+    throw new Error("Failed to resolve cart country for cart creation.");
+  }
+
+  return {
+    ...createCartData,
+    country: createCountry,
+  };
+}
+
+function snapshotInput(input: StarterBaseCartInput) {
+  return {
+    client: getStarterCommerceClient(input.language),
+    cookies: input.cookiesStore,
+    cookieOptions: cartCookieOptions(),
+    cartInclude: CART_INCLUDE,
+    itemsInclude: CART_ITEMS_INCLUDE,
+  } as const;
 }
 
 export function clearCartCookie(cookiesStore: StarterCookieStore): void {
-  const config = getStarterOminityConfig();
-  cookiesStore.set(config.cartCookieName, "", {
-    path: "/",
-    maxAge: 0,
-    httpOnly: true,
-    secure: config.nodeEnv === "production",
-    sameSite: "lax",
-  });
-}
-
-async function parseResponseBody(response: Response): Promise<unknown> {
-  if (response.status === 204) {
-    return null;
-  }
-
-  const contentType = response.headers.get("content-type") ?? "";
-  if (contentType.includes("json")) {
-    return response.json();
-  }
-
-  return response.text();
-}
-
-async function fetchCartWithRelations(
-  cartId: string,
-  language?: string,
-): Promise<Record<string, unknown> | null> {
-  const sdk = createApiKeySdk(language);
-  const response = await sdk.http.get(`/commerce/carts/${encodeURIComponent(cartId)}`, {
-    query: {
-      include: CART_RELATIONS_INCLUDE,
-    },
-    errorCodes: ["5XX"],
-  });
-
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch cart ${cartId}: status ${response.status}.`);
-  }
-
-  const payload = await parseResponseBody(response);
-  return isRecord(payload) ? payload : null;
+  clearCartIdCookie(cookiesStore, cartCookieOptions());
 }
 
 export async function getOrCreateCartSnapshot(
@@ -138,82 +184,112 @@ export async function getOrCreateCartSnapshot(
   createCartData: Readonly<Record<string, unknown>> = {},
   language?: string,
 ): Promise<StarterCartSnapshot> {
-  const sdk = createApiKeySdk(language);
-
-  let created = false;
-  let cartPayload: Record<string, unknown> | null = null;
-  const cookieCartId = cartIdFromCookie(cookiesStore);
-  if (cookieCartId) {
-    cartPayload = await fetchCartWithRelations(cookieCartId, language);
-  }
-
-  if (!cartPayload) {
-    let createdCartPayload: Record<string, unknown> | null = null;
-    try {
-      const createdCart = await sdk.commerce.carts.create(createCartData as Record<string, any>);
-      createdCartPayload = isRecord(createdCart) ? createdCart as Record<string, unknown> : null;
-    } catch (error) {
-      const recovered = recoverCartFromValidationError(error);
-      if (!recovered) {
-        throw error;
-      }
-
-      createdCartPayload = recovered;
-    }
-    created = true;
-
-    if (!createdCartPayload) {
-      throw new Error("Failed to create cart.");
-    }
-
-    const createdCartId = normalizeCart(createdCartPayload).id;
-    if (createdCartId.length === 0) {
-      throw new Error("Failed to resolve created cart id.");
-    }
-
-    cartPayload = await fetchCartWithRelations(createdCartId, language) ?? createdCartPayload;
-  }
-
-  const normalizedCart = normalizeCart(cartPayload);
-  if (normalizedCart.id.length === 0) {
-    throw new Error("Failed to resolve cart id.");
-  }
-
-  writeCartIdCookie(cookiesStore, normalizedCart.id);
-  const items = normalizeCartItemsFromCart(cartPayload);
-
-  return {
-    cart: normalizedCart,
-    items,
-    created,
-  };
+  const data = await resolvedCreateCartData(createCartData);
+  return getOrCreateCommerceCartSnapshot({
+    ...snapshotInput({
+      cookiesStore,
+      ...(typeof language === "string" ? { language } : {}),
+    }),
+    createCartData: data,
+  });
 }
 
 export async function refreshCartSnapshot(
   cookiesStore: StarterCookieStore,
   language?: string,
 ): Promise<StarterCartSnapshot | null> {
-  const cartId = cartIdFromCookie(cookiesStore);
-  if (!cartId) {
-    return null;
-  }
+  return refreshCommerceCartSnapshot(snapshotInput({
+    cookiesStore,
+    ...(typeof language === "string" ? { language } : {}),
+  }));
+}
 
-  const cartPayload = await fetchCartWithRelations(cartId, language);
-  if (!cartPayload) {
-    return null;
-  }
+export async function updateCartSnapshot(
+  cookiesStore: StarterCookieStore,
+  data: Readonly<Record<string, unknown>>,
+  createCartData: Readonly<Record<string, unknown>> = {},
+  language?: string,
+): Promise<StarterCartSnapshot> {
+  return updateCommerceCartAndRefresh({
+    ...snapshotInput({
+      cookiesStore,
+      ...(typeof language === "string" ? { language } : {}),
+    }),
+    createCartData: await resolvedCreateCartData(createCartData),
+    data,
+  });
+}
 
-  const normalizedCart = normalizeCart(cartPayload);
-  if (normalizedCart.id.length === 0) {
-    return null;
-  }
+export async function createCartItemSnapshot(
+  cookiesStore: StarterCookieStore,
+  input: {
+    readonly productId: string;
+    readonly quantity?: number;
+    readonly data?: Readonly<Record<string, unknown>>;
+  },
+  createCartData: Readonly<Record<string, unknown>> = {},
+  language?: string,
+): Promise<StarterCartSnapshot> {
+  return createCommerceCartItemAndRefresh({
+    ...snapshotInput({
+      cookiesStore,
+      ...(typeof language === "string" ? { language } : {}),
+    }),
+    createCartData: await resolvedCreateCartData(createCartData),
+    productId: input.productId,
+    ...(typeof input.quantity === "number" ? { quantity: input.quantity } : {}),
+    ...(input.data ? { data: input.data } : {}),
+  });
+}
 
-  writeCartIdCookie(cookiesStore, normalizedCart.id);
-  const items = normalizeCartItemsFromCart(cartPayload);
+export async function updateCartItemSnapshot(
+  cookiesStore: StarterCookieStore,
+  itemId: string,
+  data: Readonly<Record<string, unknown>>,
+  createCartData: Readonly<Record<string, unknown>> = {},
+  language?: string,
+): Promise<StarterCartSnapshot> {
+  return updateCommerceCartItemAndRefresh({
+    ...snapshotInput({
+      cookiesStore,
+      ...(typeof language === "string" ? { language } : {}),
+    }),
+    createCartData: await resolvedCreateCartData(createCartData),
+    itemId,
+    data,
+  });
+}
 
-  return {
-    cart: normalizedCart,
-    items,
-    created: false,
-  };
+export async function setCartItemQuantitySnapshot(
+  cookiesStore: StarterCookieStore,
+  itemId: string,
+  quantity: number,
+  createCartData: Readonly<Record<string, unknown>> = {},
+  language?: string,
+): Promise<StarterCartSnapshot> {
+  return setCommerceCartItemQuantityAndRefresh({
+    ...snapshotInput({
+      cookiesStore,
+      ...(typeof language === "string" ? { language } : {}),
+    }),
+    createCartData: await resolvedCreateCartData(createCartData),
+    itemId,
+    quantity,
+  });
+}
+
+export async function deleteCartItemSnapshot(
+  cookiesStore: StarterCookieStore,
+  itemId: string,
+  createCartData: Readonly<Record<string, unknown>> = {},
+  language?: string,
+): Promise<StarterCartSnapshot> {
+  return deleteCommerceCartItemAndRefresh({
+    ...snapshotInput({
+      cookiesStore,
+      ...(typeof language === "string" ? { language } : {}),
+    }),
+    createCartData: await resolvedCreateCartData(createCartData),
+    itemId,
+  });
 }

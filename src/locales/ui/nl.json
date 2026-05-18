@@ -1,0 +1,15 @@
+{
+  "brandName": "Ominity Starter",
+  "nav": {
+    "contact": "Contact",
+    "product": "Product",
+    "category": "Categorie",
+    "cart": "Winkelwagen",
+    "wishlist": "Verlanglijst",
+    "account": "Account"
+  },
+  "switcher": {
+    "languageLabel": "Taal",
+    "countryLabel": "Land"
+  }
+}

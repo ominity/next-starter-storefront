@@ -5,3 +5,4 @@ export * from "./locale";
 export * from "./paths";
 export * from "./format";
 export * from "./feature-pages";
+export * from "./events";

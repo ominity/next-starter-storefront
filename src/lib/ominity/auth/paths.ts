@@ -1,9 +1,14 @@
-import { normalizeLocaleCode } from "@ominity/next/cms";
+import { createCmsLinkResolver, normalizeLocaleCode, type CmsRoutingConfig } from "@ominity/next/cms";
+import {
+  buildLocalizedStaticPath,
+  type LocalizedSlugMap,
+} from "@ominity/next/next";
 
-import { cmsLocalizedStringLinkResolver } from "@/lib/ominity/routing";
+import enAuthRouteSlugs from "@/locales/routes/auth/en.json";
+import nlAuthRouteSlugs from "@/locales/routes/auth/nl.json";
+import { cmsRouting } from "@/lib/ominity/routing";
 
 export type AuthUtilityRoute =
-  | "home"
   | "login"
   | "register"
   | "account"
@@ -11,15 +16,48 @@ export type AuthUtilityRoute =
   | "forgotPassword"
   | "resetPassword";
 
-const AUTH_ROUTE_SEGMENTS: Readonly<Record<AuthUtilityRoute, string>> = {
-  home: "/",
-  login: "/auth/login",
-  register: "/auth/register",
-  account: "/account",
-  mfa: "/auth/mfa",
-  forgotPassword: "/auth/forgot-password",
-  resetPassword: "/auth/reset-password",
+export const AUTH_UTILITY_ROUTES: ReadonlyArray<AuthUtilityRoute> = [
+  "login",
+  "register",
+  "account",
+  "mfa",
+  "forgotPassword",
+  "resetPassword",
+];
+
+interface LocalizedStaticRouteDefinition {
+  readonly prefixPath?: string;
+  readonly slugByLocale: LocalizedSlugMap;
+}
+
+const AUTH_ROUTE_SLUGS_BY_LANGUAGE = {
+  en: enAuthRouteSlugs,
+  nl: nlAuthRouteSlugs,
+} as const satisfies Readonly<Record<string, Record<AuthUtilityRoute, string>>>;
+
+const AUTH_ROUTE_PREFIXES: Readonly<Record<AuthUtilityRoute, string | undefined>> = {
+  login: "/auth",
+  register: "/auth",
+  account: "/",
+  mfa: "/auth",
+  forgotPassword: "/auth",
+  resetPassword: "/auth",
 };
+
+function localizedSlugMapForRoute(route: AuthUtilityRoute): LocalizedSlugMap {
+  const entries = Object.entries(AUTH_ROUTE_SLUGS_BY_LANGUAGE).map(([language, dictionary]) => {
+    const slug = dictionary[route];
+    return [language, typeof slug === "string" ? slug : ""] as const;
+  });
+  return Object.fromEntries(entries);
+}
+
+export function authUtilityRouteDefinition(route: AuthUtilityRoute): LocalizedStaticRouteDefinition {
+  return {
+    ...(typeof AUTH_ROUTE_PREFIXES[route] === "string" ? { prefixPath: AUTH_ROUTE_PREFIXES[route] } : {}),
+    slugByLocale: localizedSlugMapForRoute(route),
+  };
+}
 
 export interface AuthUtilityPaths {
   readonly home: string;
@@ -31,22 +69,36 @@ export interface AuthUtilityPaths {
   readonly resetPassword: string;
 }
 
-export function buildAuthUtilityPath(route: AuthUtilityRoute, locale: string): string {
+export function buildAuthUtilityPath(
+  route: AuthUtilityRoute,
+  locale: string,
+  routing: CmsRoutingConfig = cmsRouting,
+): string {
   const normalizedLocale = normalizeLocaleCode(locale);
-  return cmsLocalizedStringLinkResolver.resolve(
-    AUTH_ROUTE_SEGMENTS[route],
-    { locale: normalizedLocale },
-  ).href;
+  const definition = authUtilityRouteDefinition(route);
+
+  return buildLocalizedStaticPath({
+    routing,
+    locale: normalizedLocale,
+    slugByLocale: definition.slugByLocale,
+    ...(typeof definition.prefixPath === "string" ? { prefixPath: definition.prefixPath } : {}),
+  });
 }
 
-export function buildAuthUtilityPaths(locale: string): AuthUtilityPaths {
+export function buildAuthUtilityPaths(locale: string, routing: CmsRoutingConfig = cmsRouting): AuthUtilityPaths {
+  const resolver = createCmsLinkResolver({
+    config: routing,
+    stringLinkStrategy: "localize-relative",
+  });
+  const home = resolver.resolve("/", { locale: normalizeLocaleCode(locale) }).href;
+
   return {
-    home: buildAuthUtilityPath("home", locale),
-    login: buildAuthUtilityPath("login", locale),
-    register: buildAuthUtilityPath("register", locale),
-    account: buildAuthUtilityPath("account", locale),
-    mfa: buildAuthUtilityPath("mfa", locale),
-    forgotPassword: buildAuthUtilityPath("forgotPassword", locale),
-    resetPassword: buildAuthUtilityPath("resetPassword", locale),
+    home,
+    login: buildAuthUtilityPath("login", locale, routing),
+    register: buildAuthUtilityPath("register", locale, routing),
+    account: buildAuthUtilityPath("account", locale, routing),
+    mfa: buildAuthUtilityPath("mfa", locale, routing),
+    forgotPassword: buildAuthUtilityPath("forgotPassword", locale, routing),
+    resetPassword: buildAuthUtilityPath("resetPassword", locale, routing),
   };
 }

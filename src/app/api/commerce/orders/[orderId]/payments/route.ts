@@ -1,9 +1,8 @@
 import { getStarterOminityConfig } from "@/lib/ominity/env";
+import { getStarterCommerceClient } from "@/lib/ominity/server/commerce";
 import { jsonError } from "@/lib/ominity/server/http";
 import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { mockListOrderPayments } from "@/lib/ominity/server/mock-commerce";
-import { normalizePayments } from "@/lib/ominity/server/normalize";
-import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
 interface OrderPaymentsRouteProps {
   params: Promise<{
@@ -27,11 +26,13 @@ export async function GET(request: Request, context: OrderPaymentsRouteProps): P
 
   try {
     const language = await resolveRequestSdkLanguage(request);
-    const sdk = createApiKeySdk(language);
-    const payments = await sdk.commerce.orders.listPayments(orderId);
+    const client = getStarterCommerceClient(language);
+    const payments = await client.listOrderPayments({
+      orderId,
+    });
 
     return Response.json({
-      items: normalizePayments(payments),
+      items: payments,
     });
   } catch (error) {
     return jsonError(500, "ORDER_PAYMENTS_FAILED", "Failed to load order payments.", {

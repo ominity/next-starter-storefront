@@ -1,12 +1,13 @@
 import { cookies } from "next/headers";
 
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { getOrCreateCartSnapshot } from "@/lib/ominity/server/commerce";
+import {
+  getOrCreateCartSnapshot,
+  getStarterCommerceClient,
+} from "@/lib/ominity/server/commerce";
 import { isRecord, jsonError, parseJsonBody } from "@/lib/ominity/server/http";
 import { resolveRequestCountry, resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { mockCreateOrder, mockGetOrCreateCart } from "@/lib/ominity/server/mock-commerce";
-import { normalizeOrder } from "@/lib/ominity/server/normalize";
-import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
 function asString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -77,7 +78,7 @@ export async function POST(request: Request): Promise<Response> {
       country ? { country } : {},
       language,
     );
-    const sdk = createApiKeySdk(language);
+    const client = getStarterCommerceClient(language);
 
     const orderData: Record<string, unknown> = isRecord(payload.orderData)
       ? { ...payload.orderData }
@@ -123,14 +124,15 @@ export async function POST(request: Request): Promise<Response> {
       orderData.promotionCodes = promotionCodes;
     }
 
-    const order = await sdk.commerce.orders.create(orderData as Record<string, any>);
-    const normalizedOrder = normalizeOrder(order);
-    if (!normalizedOrder.id) {
+    const order = await client.createOrder({
+      data: orderData,
+    });
+    if (!order.id) {
       return jsonError(500, "ORDER_CREATE_FAILED", "Order created but response did not include an id.");
     }
 
     return Response.json({
-      order: normalizedOrder,
+      order,
     });
   } catch (error) {
     return jsonError(500, "CHECKOUT_FAILED", "Failed to create order.", {

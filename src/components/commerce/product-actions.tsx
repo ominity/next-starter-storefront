@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import type { Route } from "next";
+import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useCommerce, type CommerceCatalogProduct } from "@/components/commerce/commerce-provider";
 import { formatMoney } from "@/lib/ominity/commerce";
+import { emitCommerceEvent } from "@/lib/ominity/commerce/events";
 import { useAuth } from "@/components/auth";
 
 export interface CommerceProductActionsProps {
@@ -21,6 +23,7 @@ export interface CommerceProductActionsProps {
     readonly wishlist: boolean;
     readonly checkout: boolean;
     readonly auth: boolean;
+    readonly guestCheckout: boolean;
   };
 }
 
@@ -28,9 +31,27 @@ export function CommerceProductActions(props: CommerceProductActionsProps) {
   const commerce = useCommerce();
   const auth = useAuth();
   const wished = commerce.isWishlisted(props.product.id);
+  const hasEmittedProductView = useRef(false);
+
+  useEffect(() => {
+    if (hasEmittedProductView.current) {
+      return;
+    }
+
+    hasEmittedProductView.current = true;
+    emitCommerceEvent("product_viewed", {
+      productId: props.product.id,
+      ...(props.product.sku ? { sku: props.product.sku } : {}),
+      ...(props.product.title ? { title: props.product.title } : {}),
+      ...(typeof props.product.unitPrice === "number" ? { unitPrice: props.product.unitPrice } : {}),
+      ...(props.product.currency ? { currency: props.product.currency } : {}),
+      ...(props.product.canonicalPath ? { canonicalPath: props.product.canonicalPath } : {}),
+    });
+  }, [props.product]);
 
   const hasAuthSession = auth.session !== null;
-  const checkoutPath = props.features.auth && !hasAuthSession
+  const requiresLoginForCheckout = props.features.auth && !props.features.guestCheckout && !hasAuthSession;
+  const checkoutPath = requiresLoginForCheckout
     ? `${props.paths.login}?returnTo=${encodeURIComponent(props.paths.checkout)}`
     : props.paths.checkout;
 
@@ -77,7 +98,7 @@ export function CommerceProductActions(props: CommerceProductActionsProps) {
             className="text-sm font-medium text-primary hover:underline"
             href={checkoutPath as Route}
           >
-            {props.features.auth && !hasAuthSession ? "Login to checkout" : "Go to checkout"}
+            {requiresLoginForCheckout ? "Login to checkout" : "Go to checkout"}
           </Link>
         )}
       </div>

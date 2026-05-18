@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import type { Route } from "next";
+import { useEffect, useRef, useState } from "react";
 
 import { useCommerce } from "@/components/commerce/commerce-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/lib/ominity/commerce";
+import { emitCommerceEvent } from "@/lib/ominity/commerce/events";
 import { useAuth } from "@/components/auth";
 
 export interface CommerceCartPageProps {
@@ -18,12 +21,29 @@ export interface CommerceCartPageProps {
   readonly features: {
     readonly checkout: boolean;
     readonly auth: boolean;
+    readonly guestCheckout: boolean;
   };
 }
 
 export function CommerceCartPage(props: CommerceCartPageProps) {
   const commerce = useCommerce();
   const auth = useAuth();
+  const [promotionCodeInput, setPromotionCodeInput] = useState("");
+  const hasEmittedCartViewed = useRef(false);
+
+  useEffect(() => {
+    if (!commerce.ready || hasEmittedCartViewed.current) {
+      return;
+    }
+
+    hasEmittedCartViewed.current = true;
+    emitCommerceEvent("cart_viewed", {
+      cartCount: commerce.cartCount,
+      cartSubtotal: commerce.cartSubtotal,
+      ...(commerce.cart[0]?.currency ? { currency: commerce.cart[0].currency } : {}),
+      ...(commerce.promotionCodes.length > 0 ? { promotionCodes: commerce.promotionCodes } : {}),
+    });
+  }, [commerce.cart, commerce.cartCount, commerce.cartSubtotal, commerce.promotionCodes, commerce.ready]);
 
   if (!commerce.ready) {
     return (
@@ -34,9 +54,11 @@ export function CommerceCartPage(props: CommerceCartPageProps) {
   }
 
   const hasSession = auth.session !== null;
-  const checkoutPath = props.features.auth && !hasSession
+  const requiresLoginForCheckout = props.features.auth && !props.features.guestCheckout && !hasSession;
+  const checkoutPath = requiresLoginForCheckout
     ? `${props.paths.login}?returnTo=${encodeURIComponent(props.paths.checkout)}`
     : props.paths.checkout;
+  const canApplyPromotionCode = promotionCodeInput.trim().length > 0;
 
   return (
     <div className="space-y-6">
@@ -62,8 +84,14 @@ export function CommerceCartPage(props: CommerceCartPageProps) {
             {commerce.cart.map((item) => (
               <Card key={item.id}>
                 <CardHeader>
-                  <CardTitle className="text-lg">{item.title}</CardTitle>
-                  <CardDescription>SKU {item.sku}</CardDescription>
+                  <CardTitle className="text-lg">{item.title ?? item.sku ?? item.id}</CardTitle>
+                  <CardDescription>
+                    {typeof item.sku === "string" && item.sku.length > 0
+                      ? `SKU ${item.sku}`
+                      : typeof item.productId === "string"
+                        ? `Product ${item.productId}`
+                        : "Product"}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-sm text-muted-foreground">
@@ -103,13 +131,59 @@ export function CommerceCartPage(props: CommerceCartPageProps) {
               <CardTitle>Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <label htmlFor="cart-promotion-code" className="text-xs font-medium text-muted-foreground">
+                  Promotion code
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="cart-promotion-code"
+                    value={promotionCodeInput}
+                    onChange={(event) => setPromotionCodeInput(event.currentTarget.value)}
+                    placeholder="Enter code"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!canApplyPromotionCode}
+                    onClick={() => {
+                      const code = promotionCodeInput.trim();
+                      if (code.length === 0) {
+                        return;
+                      }
+
+                      void commerce.applyPromotionCode(code);
+                      setPromotionCodeInput("");
+                    }}
+                  >
+                    Apply
+                  </Button>
+                </div>
+                {commerce.promotionCodes.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {commerce.promotionCodes.map((code) => (
+                      <Button
+                        key={code}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { void commerce.removePromotionCode(code); }}
+                      >
+                        Remove {code}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No promotion code applied.</p>
+                )}
+              </div>
               <div className="flex items-center justify-between text-sm">
                 <span>Subtotal</span>
                 <span>{formatMoney(commerce.cartSubtotal, commerce.cart[0]?.currency ?? "EUR")}</span>
               </div>
               {props.features.checkout ? (
                 <Link href={checkoutPath as Route} className="inline-block text-sm font-medium text-primary hover:underline">
-                  {props.features.auth && !hasSession ? "Login to checkout" : "Proceed to checkout"}
+                  {requiresLoginForCheckout ? "Login to checkout" : "Proceed to checkout"}
                 </Link>
               ) : (
                 <p className="text-xs text-muted-foreground">

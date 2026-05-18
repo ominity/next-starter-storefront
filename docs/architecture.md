@@ -12,7 +12,7 @@
   - App Router routes and route handlers
   - root page entry (`/page.tsx`) for `/` redirect/fallback
   - catch-all CMS page entry (`(pages)/[...segment]`)
-  - modular commerce routes (`/p/...`, `/c/...`, `/cart`, `/wishlist`, `/checkout`, `/payment`)
+  - modular commerce routes (localized templates from `src/locales/routes/commerce/*.json` for product/category and utility pages)
   - separate auth routes (`/auth/*`, `/account`)
   - auth + commerce API bridge routes (`/api/auth/*`, `/api/commerce/*`)
   - metadata/sitemap/draft endpoints

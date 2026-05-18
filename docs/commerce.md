@@ -4,12 +4,12 @@ This starter ships a modular commerce layer intended as a foundation for a Shopw
 
 ## Included modules
 
-- products (`/p/{sku}-{slug}`)
-- categories (`/c/{slug...}`)
-- cart (`/cart`)
-- wishlist (`/wishlist`)
-- checkout (`/checkout`)
-- payment (`/payment`)
+- products (template from `src/locales/routes/commerce/{lang}.json`, e.g. `product: "p/{sku}-{slug}"`)
+- categories (template from `src/locales/routes/commerce/{lang}.json`, e.g. `category: "c/{slug}"`)
+- cart (template key `cart` in `src/locales/routes/commerce/{lang}.json`)
+- wishlist (template key `wishlist` in `src/locales/routes/commerce/{lang}.json`)
+- checkout (template key `checkout` in `src/locales/routes/commerce/{lang}.json`)
+- payment (template key `payment` in `src/locales/routes/commerce/{lang}.json`, supports nested paths like `checkout/payment`)
 - auth/account is provided by the separate auth module (`src/app/(auth)`)
 
 All modules support the configured locale segment strategy:
@@ -30,6 +30,11 @@ Control module availability from `.env.local`:
 - `OMINITY_FEATURE_CHECKOUT`
 - `OMINITY_FEATURE_PAYMENT`
 - `OMINITY_CHECKOUT_ALLOW_GUEST`
+
+Route templates are configured in locale route dictionaries (`src/locales/routes/commerce/*.json`) via:
+- `product` (e.g. `"p/{sku}-{slug}"`)
+- `category` (e.g. `"c/{slug}"`)
+- `products`, `cart`, `wishlist`, `checkout`, `payment` (any relative path, including multi-segment paths)
 
 Disabled modules return `404` for their routes.
 

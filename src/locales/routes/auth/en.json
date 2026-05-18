@@ -1,0 +1,8 @@
+{
+  "login": "login",
+  "register": "register",
+  "account": "account",
+  "mfa": "mfa",
+  "forgotPassword": "forgot-password",
+  "resetPassword": "reset-password"
+}

@@ -85,6 +85,7 @@ export function CommerceProductPage(props: CommerceProductPageProps) {
               wishlist: config.enableCommerceWishlist,
               checkout: config.enableCommerceCheckout,
               auth: config.enableAuth,
+              guestCheckout: config.checkoutAllowGuest,
             }}
           />
           <p className="text-xs text-muted-foreground">

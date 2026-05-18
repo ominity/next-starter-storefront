@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
-import { normalizeLocaleCode, parseLocaleCode } from "@ominity/next/cms";
+import {
+  normalizeLocaleCode,
+  parseLocaleCode,
+  resolveAlternateLocaleTargets,
+  type CmsRouteObject,
+} from "@ominity/next/cms";
 
 import { getStarterChannelContext } from "@/lib/ominity/channel-context";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
+import { cmsLinkResolver, getChannelAwareCmsRouting } from "@/lib/ominity/routing";
 
 import {
   findCommerceCategoryBySlugSegments,
@@ -11,6 +17,10 @@ import {
   listCommerceProductRouteEntries,
   listCommerceProductsForCategory,
 } from "./data-source";
+import {
+  commerceCategoryIncomingSuffixSegments,
+  commerceProductIncomingSuffixSegments,
+} from "./route-translations";
 import { resolveLocaleForCommerceVariant, variantMatchesCurrentStrategy } from "./locale";
 import type {
   CommerceLocaleVariant,
@@ -121,6 +131,70 @@ function absoluteCanonical(path: string): string {
   return new URL(path, config.siteUrl).toString();
 }
 
+function localeCandidates(locale: string): ReadonlyArray<string> {
+  const normalizedLocale = normalizeLocaleCode(locale);
+  const parsed = parseLocaleCode(normalizedLocale);
+  return Array.from(new Set([normalizedLocale, parsed.language].filter((entry) => entry.length > 0)));
+}
+
+function resolveRouteForLocale(
+  routes: Readonly<Record<string, CmsRouteObject>>,
+  locale: string,
+  routeName: "product" | "category",
+): CmsRouteObject | null {
+  for (const candidate of localeCandidates(locale)) {
+    const direct = routes[normalizeLocaleCode(candidate)];
+    if (direct && direct.name === routeName) {
+      return direct;
+    }
+  }
+
+  const targetLanguage = parseLocaleCode(normalizeLocaleCode(locale)).language;
+  for (const route of Object.values(routes)) {
+    if (route.name !== routeName) {
+      continue;
+    }
+
+    const routeLocale = normalizeLocaleCode(route.locale ?? "");
+    if (parseLocaleCode(routeLocale).language === targetLanguage) {
+      return route;
+    }
+  }
+
+  return Object.values(routes).find((route) => route.name === routeName) ?? null;
+}
+
+async function commerceRouteLanguageAlternates(
+  routes: Readonly<Record<string, CmsRouteObject>>,
+  routeName: "product" | "category",
+): Promise<Readonly<Record<string, string>>> {
+  const channelContext = await getStarterChannelContext();
+  const routing = await getChannelAwareCmsRouting();
+  const entries: Array<[string, string]> = [];
+  const targets = resolveAlternateLocaleTargets({
+    localeSegmentStrategy: routing.localeSegmentStrategy,
+    locales: routing.locales,
+    countries: channelContext.countries,
+    languages: channelContext.languages,
+  });
+
+  for (const target of targets) {
+    const route = resolveRouteForLocale(routes, target.locale, routeName);
+    if (!route) {
+      continue;
+    }
+
+    try {
+      const path = cmsLinkResolver.resolve(route, { locale: target.locale }).href;
+      entries.push([target.hrefLang, absoluteCanonical(path)]);
+    } catch {
+      // Skip invalid route payloads; canonical URL is still emitted.
+    }
+  }
+
+  return Object.fromEntries(entries);
+}
+
 export async function resolveProductPageData(input: ResolveProductPageInput): Promise<ResolvedProductPage | null> {
   const config = getStarterOminityConfig();
   if (!config.enableCommerce || !config.enableCommerceProducts) {
@@ -150,7 +224,7 @@ export async function resolveProductPageData(input: ResolveProductPageInput): Pr
     variant: input.variant,
     ...(typeof input.countrySegment === "string" ? { countrySegment: input.countrySegment } : {}),
     ...(typeof input.localeSegment === "string" ? { localeSegment: input.localeSegment } : {}),
-    suffixSegments: ["p", input.productSegment],
+    suffixSegments: commerceProductIncomingSuffixSegments(locale, input.productSegment),
   });
 
   return {
@@ -194,7 +268,7 @@ export async function resolveCategoryPageData(input: ResolveCategoryPageInput): 
     variant: input.variant,
     ...(typeof input.countrySegment === "string" ? { countrySegment: input.countrySegment } : {}),
     ...(typeof input.localeSegment === "string" ? { localeSegment: input.localeSegment } : {}),
-    suffixSegments: ["c", ...input.slugSegments],
+    suffixSegments: commerceCategoryIncomingSuffixSegments(locale, input.slugSegments),
   });
 
   return {
@@ -205,19 +279,27 @@ export async function resolveCategoryPageData(input: ResolveCategoryPageInput): 
   };
 }
 
-export function buildProductMetadata(input: ResolvedProductPage): Metadata {
+export async function buildProductMetadata(input: ResolvedProductPage): Promise<Metadata> {
   const description = input.product.record.shortDescription ?? input.product.record.description;
+  const canonicalUrl = absoluteCanonical(input.product.canonicalPath);
+  const languages = {
+    ...(await commerceRouteLanguageAlternates(input.product.record.routes, "product")),
+  };
+  if (!languages[input.locale]) {
+    languages[input.locale] = canonicalUrl;
+  }
 
   return {
     title: input.product.record.title,
     ...(typeof description === "string" ? { description } : {}),
     alternates: {
-      canonical: absoluteCanonical(input.product.canonicalPath),
+      canonical: canonicalUrl,
+      ...(Object.keys(languages).length > 0 ? { languages } : {}),
     },
     openGraph: {
       title: input.product.record.title,
       ...(typeof description === "string" ? { description } : {}),
-      url: absoluteCanonical(input.product.canonicalPath),
+      url: canonicalUrl,
       locale: input.locale,
       ...(typeof input.product.record.coverImage === "string"
         ? {
@@ -233,19 +315,27 @@ export function buildProductMetadata(input: ResolvedProductPage): Metadata {
   };
 }
 
-export function buildCategoryMetadata(input: ResolvedCategoryPage): Metadata {
+export async function buildCategoryMetadata(input: ResolvedCategoryPage): Promise<Metadata> {
   const description = input.category.record.description;
+  const canonicalUrl = absoluteCanonical(input.category.canonicalPath);
+  const languages = {
+    ...(await commerceRouteLanguageAlternates(input.category.record.routes, "category")),
+  };
+  if (!languages[input.locale]) {
+    languages[input.locale] = canonicalUrl;
+  }
 
   return {
     title: input.category.record.name,
     ...(typeof description === "string" ? { description } : {}),
     alternates: {
-      canonical: absoluteCanonical(input.category.canonicalPath),
+      canonical: canonicalUrl,
+      ...(Object.keys(languages).length > 0 ? { languages } : {}),
     },
     openGraph: {
       title: input.category.record.name,
       ...(typeof description === "string" ? { description } : {}),
-      url: absoluteCanonical(input.category.canonicalPath),
+      url: canonicalUrl,
       locale: input.locale,
       ...(typeof input.category.record.coverImage === "string"
         ? {

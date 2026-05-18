@@ -1,23 +1,33 @@
-import { normalizeLocaleCode } from "@ominity/next/cms";
+import { createCmsLinkResolver, normalizeLocaleCode, type CmsRoutingConfig } from "@ominity/next/cms";
+import {
+  buildLocalizedStaticPath,
+  type LocalizedSlugMap,
+} from "@ominity/next/next";
 
-import { cmsLocalizedStringLinkResolver } from "@/lib/ominity/routing";
+import { cmsRouting } from "@/lib/ominity/routing";
+import {
+  COMMERCE_UTILITY_ROUTES,
+  localizedCommerceSlugMapForRoute,
+  type CommerceUtilityRoute,
+} from "./route-translations";
 
-export type CommerceUtilityRoute =
-  | "home"
-  | "products"
-  | "cart"
-  | "wishlist"
-  | "checkout"
-  | "payment";
+export { COMMERCE_UTILITY_ROUTES, type CommerceUtilityRoute };
 
-const COMMERCE_ROUTE_SEGMENTS: Readonly<Record<CommerceUtilityRoute, string>> = {
-  home: "/",
-  products: "/products",
-  cart: "/cart",
-  wishlist: "/wishlist",
-  checkout: "/checkout",
-  payment: "/payment",
-};
+interface LocalizedStaticRouteDefinition {
+  readonly prefixPath?: string;
+  readonly slugByLocale: LocalizedSlugMap;
+}
+
+function localizedSlugMapForRoute(route: CommerceUtilityRoute): LocalizedSlugMap {
+  return localizedCommerceSlugMapForRoute(route);
+}
+
+export function commerceUtilityRouteDefinition(route: CommerceUtilityRoute): LocalizedStaticRouteDefinition {
+  return {
+    prefixPath: "/",
+    slugByLocale: localizedSlugMapForRoute(route),
+  };
+}
 
 export interface CommerceUtilityPaths {
   readonly home: string;
@@ -28,21 +38,38 @@ export interface CommerceUtilityPaths {
   readonly payment: string;
 }
 
-export function buildCommerceUtilityPath(route: CommerceUtilityRoute, locale: string): string {
+export function buildCommerceUtilityPath(
+  route: CommerceUtilityRoute,
+  locale: string,
+  routing: CmsRoutingConfig = cmsRouting,
+): string {
   const normalizedLocale = normalizeLocaleCode(locale);
-  return cmsLocalizedStringLinkResolver.resolve(
-    COMMERCE_ROUTE_SEGMENTS[route],
-    { locale: normalizedLocale },
-  ).href;
+  const definition = commerceUtilityRouteDefinition(route);
+
+  return buildLocalizedStaticPath({
+    routing,
+    locale: normalizedLocale,
+    slugByLocale: definition.slugByLocale,
+    ...(typeof definition.prefixPath === "string" ? { prefixPath: definition.prefixPath } : {}),
+  });
 }
 
-export function buildCommerceUtilityPaths(locale: string): CommerceUtilityPaths {
+export function buildCommerceUtilityPaths(
+  locale: string,
+  routing: CmsRoutingConfig = cmsRouting,
+): CommerceUtilityPaths {
+  const resolver = createCmsLinkResolver({
+    config: routing,
+    stringLinkStrategy: "localize-relative",
+  });
+  const home = resolver.resolve("/", { locale: normalizeLocaleCode(locale) }).href;
+
   return {
-    home: buildCommerceUtilityPath("home", locale),
-    products: buildCommerceUtilityPath("products", locale),
-    cart: buildCommerceUtilityPath("cart", locale),
-    wishlist: buildCommerceUtilityPath("wishlist", locale),
-    checkout: buildCommerceUtilityPath("checkout", locale),
-    payment: buildCommerceUtilityPath("payment", locale),
+    home,
+    products: buildCommerceUtilityPath("products", locale, routing),
+    cart: buildCommerceUtilityPath("cart", locale, routing),
+    wishlist: buildCommerceUtilityPath("wishlist", locale, routing),
+    checkout: buildCommerceUtilityPath("checkout", locale, routing),
+    payment: buildCommerceUtilityPath("payment", locale, routing),
   };
 }

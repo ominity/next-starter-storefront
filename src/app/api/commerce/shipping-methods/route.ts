@@ -1,8 +1,7 @@
 import { getStarterOminityConfig } from "@/lib/ominity/env";
+import { getStarterCommerceClient } from "@/lib/ominity/server/commerce";
 import { jsonError } from "@/lib/ominity/server/http";
 import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
-import { normalizeShippingMethods } from "@/lib/ominity/server/normalize";
-import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
 export async function GET(request: Request): Promise<Response> {
   const config = getStarterOminityConfig();
@@ -21,11 +20,11 @@ export async function GET(request: Request): Promise<Response> {
 
   try {
     const language = await resolveRequestSdkLanguage(request);
-    const sdk = createApiKeySdk(language);
-    const methods = await sdk.commerce.shippingMethods.list();
+    const client = getStarterCommerceClient(language);
+    const methods = await client.listShippingMethods();
 
     return Response.json({
-      items: normalizeShippingMethods(methods),
+      items: methods,
     });
   } catch (error) {
     return jsonError(500, "SHIPPING_METHODS_FAILED", "Failed to load shipping methods.", {

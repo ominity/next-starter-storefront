@@ -16,7 +16,7 @@ This starter is designed for long-term maintainability across multiple websites.
 - **Configurable routing** (`none`, `language`, `country-language`)
 - **Canonical/alternate SEO support** via `@ominity/next`
 - **Mixed Server + Client CMS components** (interactive slider and form in otherwise server-rendered pages)
-- **Commerce route module** with product (`/p/...`) and category (`/c/...`) pages
+- **Commerce route module** with localized route templates from locale dictionaries
 - **Separate route modules** for `cms`, `commerce`, and `auth`
 - **Commerce feature modules** for cart, wishlist, checkout, and payment
 - **Separate auth feature set** for login/register/account/MFA and session state
@@ -88,12 +88,12 @@ The starter includes separate route modules:
 
 Commerce module routes:
 
-- product pages (`/p/{sku}-{slug}` with locale strategy support)
-- category pages (`/c/{slug...}` with hierarchical slug support)
-- cart (`/cart`)
-- wishlist (`/wishlist`)
-- checkout (`/checkout`)
-- payment (`/payment?order=...`)
+- product pages (template from `src/locales/routes/commerce/{lang}.json`, e.g. `product: "p/{sku}-{slug}"`)
+- category pages (template from `src/locales/routes/commerce/{lang}.json`, e.g. `category: "c/{slug}"`)
+- cart (from `src/locales/routes/commerce/{lang}.json`, key: `cart`)
+- wishlist (from `src/locales/routes/commerce/{lang}.json`, key: `wishlist`)
+- checkout (from `src/locales/routes/commerce/{lang}.json`, key: `checkout`)
+- payment (from `src/locales/routes/commerce/{lang}.json`, key: `payment`; can be nested like `checkout/payment`)
 - account links integrate with auth module when enabled
 
 Starter APIs:

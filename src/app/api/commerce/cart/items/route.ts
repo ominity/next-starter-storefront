@@ -1,11 +1,10 @@
 import { cookies } from "next/headers";
 
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { getOrCreateCartSnapshot } from "@/lib/ominity/server/commerce";
+import { createCartItemSnapshot } from "@/lib/ominity/server/commerce";
 import { isRecord, jsonError, parseJsonBody } from "@/lib/ominity/server/http";
 import { resolveRequestCountry, resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
 import { mockAddCartItem, mockGetOrCreateCart } from "@/lib/ominity/server/mock-commerce";
-import { createApiKeySdk } from "@/lib/ominity/server/sdk";
 
 function normalizeQuantity(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -22,6 +21,28 @@ function normalizeQuantity(value: unknown): number {
   return 1;
 }
 
+function normalizeProductId(value: unknown): string | number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  if (Number.isFinite(parsed) && `${parsed}` === trimmed) {
+    return parsed;
+  }
+
+  return trimmed;
+}
+
 export async function POST(request: Request): Promise<Response> {
   let payload: unknown;
   try {
@@ -34,10 +55,10 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(400, "INVALID_PAYLOAD", "Request body must be an object.");
   }
 
-  const productId = typeof payload.productId === "string" ? payload.productId.trim() : "";
+  const productId = normalizeProductId(payload.productId);
   const quantity = normalizeQuantity(payload.quantity);
 
-  if (productId.length === 0) {
+  if (productId === null) {
     return jsonError(400, "INVALID_PRODUCT_ID", "A non-empty productId is required.");
   }
 
@@ -48,7 +69,7 @@ export async function POST(request: Request): Promise<Response> {
     const current = mockGetOrCreateCart(cookieStore.get(config.cartCookieName)?.value);
     const snapshot = mockAddCartItem({
       cartId: current.cart.id,
-      productId,
+      productId: String(productId),
       quantity,
       ...(typeof payload.sku === "string" ? { sku: payload.sku } : {}),
       ...(typeof payload.title === "string" ? { title: payload.title } : {}),
@@ -75,11 +96,15 @@ export async function POST(request: Request): Promise<Response> {
     const language = await resolveRequestSdkLanguage(request);
     const country = await resolveRequestCountry(request);
     const createCartData = country ? { country } : {};
-    const snapshot = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
-    const sdk = createApiKeySdk(language);
-    await sdk.commerce.cartItems.create(snapshot.cart.id, productId, quantity);
-    const refreshed = await getOrCreateCartSnapshot(cookieStore, createCartData, language);
-
+    const refreshed = await createCartItemSnapshot(
+      cookieStore,
+      {
+        productId: String(productId),
+        quantity,
+      },
+      createCartData,
+      language,
+    );
     return Response.json(refreshed);
   } catch (error) {
     return jsonError(500, "CART_ITEM_CREATE_FAILED", "Failed to add item to cart.", {

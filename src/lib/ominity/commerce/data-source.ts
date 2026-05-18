@@ -1,13 +1,17 @@
 import { Ominity } from "@ominity/api-typescript";
 import { normalizeLocaleCode, parseLocaleCode, type CmsRouteObject } from "@ominity/next/cms";
+import { buildLocalizedRoutePath } from "@ominity/next/next";
 
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { cmsLinkResolver } from "@/lib/ominity/routing";
+import { cmsLinkResolver, cmsRouting } from "@/lib/ominity/routing";
 
 import {
   MOCK_COMMERCE_CATEGORIES,
   MOCK_COMMERCE_PRODUCTS,
 } from "./mock-data";
+import {
+  localizedCommerceTemplateMapForRoute,
+} from "./route-translations";
 import type {
   StarterCommerceCategoryRecord,
   StarterCommerceCategoryRouteEntry,
@@ -18,6 +22,8 @@ import type {
 } from "./types";
 
 const liveCommerceSdkByLanguage = new Map<string, Ominity>();
+const PRODUCT_TEMPLATE_BY_LOCALE = localizedCommerceTemplateMapForRoute("product");
+const CATEGORY_TEMPLATE_BY_LOCALE = localizedCommerceTemplateMapForRoute("category");
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -31,6 +37,10 @@ function asString(value: unknown): string | undefined {
 
 function asNumber(value: unknown): number | undefined {
   return typeof value === "number" ? value : undefined;
+}
+
+function asArray(value: unknown): ReadonlyArray<unknown> {
+  return Array.isArray(value) ? value : [];
 }
 
 function asPrice(value: unknown): number | undefined {
@@ -48,7 +58,265 @@ function asPrice(value: unknown): number | undefined {
   return undefined;
 }
 
-function resolveProductPrice(input: UnknownRecord): { readonly price?: number; readonly currency?: string } {
+function recordId(input: UnknownRecord): { readonly id: string; readonly numericId?: number } | null {
+  const idValue = asString(input.id) ?? (typeof input.id === "number" ? `${input.id}` : null);
+  if (!idValue) {
+    return null;
+  }
+
+  return {
+    id: idValue,
+    ...(typeof input.id === "number" ? { numericId: input.id } : {}),
+  };
+}
+
+function asNullableNumber(value: unknown): number | null | undefined {
+  if (value === null) {
+    return null;
+  }
+
+  return asNumber(value);
+}
+
+function customFieldValue(
+  input: UnknownRecord,
+  keys: ReadonlyArray<string>,
+): unknown {
+  for (const key of keys) {
+    if (key in input) {
+      return input[key];
+    }
+  }
+
+  const customFields = asArray(input.customFields);
+  for (const field of customFields) {
+    if (!isRecord(field)) {
+      continue;
+    }
+
+    const fieldKey = asString(field.key) ?? asString(field.name) ?? asString(field.slug);
+    if (!fieldKey) {
+      continue;
+    }
+
+    if (!keys.includes(fieldKey)) {
+      continue;
+    }
+
+    if ("value" in field) {
+      return field.value;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeProductOffers(input: UnknownRecord) {
+  const embedded = isRecord(input._embedded) ? input._embedded : null;
+  const offerEntries = [
+    ...asArray(input.offers),
+    ...(embedded ? asArray(embedded.offers) : []),
+  ];
+  const offers = offerEntries
+    .map((entry) => {
+      if (!isRecord(entry)) {
+        return null;
+      }
+
+      const id = recordId(entry);
+      if (!id) {
+        return null;
+      }
+
+      const priceEntries = isRecord(entry.prices) ? entry.prices : {};
+      const prices: Record<string, { amount: number; formatted?: string }> = {};
+
+      for (const [currencyCode, moneyValue] of Object.entries(priceEntries)) {
+        if (!isRecord(moneyValue)) {
+          continue;
+        }
+
+        const amount = asPrice(moneyValue.amount);
+        if (typeof amount !== "number") {
+          continue;
+        }
+
+        const formatted = asString(moneyValue.formatted);
+        prices[currencyCode] = {
+          amount,
+          ...(typeof formatted === "string" ? { formatted } : {}),
+        };
+      }
+
+      const type = asString(entry.type);
+      const quantity = asNumber(entry.quantity);
+      const intervalId = asNullableNumber(entry.intervalId);
+
+      return {
+        ...id,
+        ...(typeof type === "string" ? { type } : {}),
+        ...(typeof quantity === "number" ? { quantity } : {}),
+        ...(typeof intervalId !== "undefined" ? { intervalId } : {}),
+        prices,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  return offers;
+}
+
+function extractCategorySlugsFromRoutes(
+  routes: Readonly<Record<string, CmsRouteObject>>,
+): Readonly<Record<string, string>> | undefined {
+  const categorySlugs: Record<string, string> = {};
+
+  for (const [localeCode, route] of Object.entries(routes)) {
+    if (route.name !== "category") {
+      continue;
+    }
+
+    const slug = normalizePathSegments(route.parameters.slug).join("/");
+    if (slug.length === 0) {
+      continue;
+    }
+
+    const normalizedLocale = normalizeLocaleCode(localeCode);
+    categorySlugs[normalizedLocale] = slug;
+
+    const language = parseLocaleCode(normalizedLocale).language;
+    if (language.length > 0 && !categorySlugs[language]) {
+      categorySlugs[language] = slug;
+    }
+  }
+
+  return Object.keys(categorySlugs).length > 0 ? categorySlugs : undefined;
+}
+
+function normalizeCategorySlugMap(input: unknown): Readonly<Record<string, string>> | undefined {
+  if (!isRecord(input)) {
+    return undefined;
+  }
+
+  const result: Record<string, string> = {};
+  for (const [localeKey, value] of Object.entries(input)) {
+    const slug = normalizePathSegments(value).join("/");
+    if (slug.length === 0) {
+      continue;
+    }
+
+    const normalizedLocale = normalizeLocaleCode(localeKey);
+    result[normalizedLocale] = slug;
+
+    const language = parseLocaleCode(normalizedLocale).language;
+    if (language.length > 0 && !result[language]) {
+      result[language] = slug;
+    }
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function normalizeProductCategory(input: UnknownRecord) {
+  const embedded = isRecord(input._embedded) ? input._embedded : null;
+  const rawCategory = isRecord(input.category)
+    ? input.category
+    : embedded && isRecord(embedded.category)
+      ? embedded.category
+      : null;
+
+  if (!rawCategory) {
+    return null;
+  }
+
+  const categoryId = recordId(rawCategory);
+  if (!categoryId) {
+    return null;
+  }
+
+  const name = asString(rawCategory.name);
+  const slug = asString(rawCategory.slug);
+  const fullSlug = asString(rawCategory.fullSlug);
+  const routes = normalizeRouteMap(rawCategory.routes);
+  const categorySlugs = extractCategorySlugsFromRoutes(routes);
+
+  return {
+    category: {
+      ...categoryId,
+      ...(typeof name === "string" ? { name } : {}),
+      ...(typeof slug === "string" ? { slug } : {}),
+      ...(typeof fullSlug === "string" ? { fullSlug } : {}),
+    },
+    ...(typeof categoryId.numericId === "number" ? { categoryId: categoryId.numericId } : {}),
+    ...(categorySlugs ? { categorySlugs } : {}),
+  };
+}
+
+function normalizeProductGroups(input: UnknownRecord) {
+  const embedded = isRecord(input._embedded) ? input._embedded : null;
+  const groupEntries = [
+    ...asArray(input.groups),
+    ...(embedded ? asArray(embedded.product_groups) : []),
+    ...(embedded ? asArray(embedded.groups) : []),
+  ];
+
+  const groups = groupEntries
+    .map((entry) => {
+      if (!isRecord(entry)) {
+        return null;
+      }
+
+      const id = recordId(entry);
+      if (!id) {
+        return null;
+      }
+
+      const name = asString(entry.name);
+      const slug = asString(entry.slug);
+      const displayType = asString(customFieldValue(entry, ["displayType", "display_type", "type"]));
+      const image = asString(customFieldValue(entry, ["image", "coverImage", "icon"]));
+      const color = asString(customFieldValue(entry, ["color", "colour"]));
+      const label = asString(customFieldValue(entry, ["label", "title"]));
+
+      return {
+        ...id,
+        ...(typeof name === "string" ? { name } : {}),
+        ...(typeof slug === "string" ? { slug } : {}),
+        ...(typeof displayType === "string" ? { displayType } : {}),
+        ...(typeof image === "string" ? { image } : {}),
+        ...(typeof color === "string" ? { color } : {}),
+        ...(typeof label === "string" ? { label } : {}),
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  if (groups.length === 0) {
+    return undefined;
+  }
+
+  const deduped = new Map<string, (typeof groups)[number]>();
+  for (const group of groups) {
+    deduped.set(group.id, group);
+  }
+
+  return Array.from(deduped.values());
+}
+
+function resolveProductPrice(
+  input: UnknownRecord,
+  offers: ReadonlyArray<ReturnType<typeof normalizeProductOffers>[number]>,
+): { readonly price?: number; readonly currency?: string } {
+  const primaryOffer = offers.find((offer) => offer.quantity === 1) ?? offers[0];
+  if (primaryOffer) {
+    const [currencyCode, value] = Object.entries(primaryOffer.prices)[0] ?? [];
+    const amount = value?.amount;
+    if (typeof currencyCode === "string" && typeof amount === "number") {
+      return {
+        price: amount,
+        currency: currencyCode,
+      };
+    }
+  }
+
   const rawPrice = input.price;
   const nestedPrice = isRecord(rawPrice) ? rawPrice : null;
 
@@ -187,11 +455,50 @@ function canonicalPathForRoute(route: CmsRouteObject, locale: string): string {
     return cmsLinkResolver.resolve(route, { locale }).href;
   } catch {
     if (route.name === "product") {
+      const skuValue = route.parameters.sku;
+      const sku = typeof skuValue === "number"
+        ? `${skuValue}`
+        : typeof skuValue === "string"
+          ? skuValue.trim()
+          : "";
+      const slugSegments = normalizePathSegments(route.parameters.slug);
+
+      if (sku.length > 0 && slugSegments.length > 0) {
+        try {
+          return buildLocalizedRoutePath({
+            routing: cmsRouting,
+            locale,
+            templateByLocale: PRODUCT_TEMPLATE_BY_LOCALE,
+            params: {
+              sku,
+              slug: slugSegments.join("-"),
+            },
+          });
+        } catch {
+          // Fall through to legacy fallback below.
+        }
+      }
+
       const segment = productRouteSegment(route);
       return segment ? `/p/${segment}` : "/";
     }
 
     const segments = routePathSegments(route);
+    if (segments.length > 0) {
+      try {
+        return buildLocalizedRoutePath({
+          routing: cmsRouting,
+          locale,
+          templateByLocale: CATEGORY_TEMPLATE_BY_LOCALE,
+          params: {
+            slug: [...segments],
+          },
+        });
+      } catch {
+        // Fall through to legacy fallback below.
+      }
+    }
+
     return segments.length > 0 ? `/c/${segments.join("/")}` : "/c";
   }
 }
@@ -212,20 +519,24 @@ function normalizeLiveProduct(input: unknown): StarterCommerceProductRecord | nu
     return null;
   }
 
-  const idValue = asString(input.id) ?? (typeof input.id === "number" ? `${input.id}` : null);
-  if (!idValue) {
+  const productId = recordId(input);
+  if (!productId) {
     return null;
   }
+
   const shortDescription = asString(input.shortDescription);
   const description = asString(input.description);
   const coverImage = asString(input.coverImage);
   const stock = asNumber(input.stock);
   const categoryId = asNumber(input.categoryId);
-  const pricing = resolveProductPrice(input);
+  const offers = normalizeProductOffers(input);
+  const pricing = resolveProductPrice(input, offers);
+  const category = normalizeProductCategory(input);
+  const directCategorySlugs = normalizeCategorySlugMap(input.categorySlugs);
+  const groups = normalizeProductGroups(input);
 
   return {
-    id: idValue,
-    ...(typeof input.id === "number" ? { numericId: input.id } : {}),
+    ...productId,
     sku,
     title,
     ...(typeof shortDescription === "string" ? { shortDescription } : {}),
@@ -233,6 +544,10 @@ function normalizeLiveProduct(input: unknown): StarterCommerceProductRecord | nu
     ...(typeof coverImage === "string" ? { coverImage } : {}),
     ...(typeof stock === "number" ? { stock } : {}),
     ...(typeof categoryId === "number" ? { categoryId } : {}),
+    ...(directCategorySlugs ? { categorySlugs: directCategorySlugs } : {}),
+    ...(category ? category : {}),
+    ...(offers.length > 0 ? { offers } : {}),
+    ...(groups ? { groups } : {}),
     ...pricing,
     routes,
   };
@@ -253,18 +568,18 @@ function normalizeLiveCategory(input: unknown): StarterCommerceCategoryRecord | 
     return null;
   }
 
-  const idValue = asString(input.id) ?? (typeof input.id === "number" ? `${input.id}` : null);
-  if (!idValue) {
+  const categoryId = recordId(input);
+  if (!categoryId) {
     return null;
   }
+
   const description = asString(input.description);
   const coverImage = asString(input.coverImage);
   const productsCount = asNumber(input.productsCount);
   const fullSlug = asString(input.fullSlug);
 
   return {
-    id: idValue,
-    ...(typeof input.id === "number" ? { numericId: input.id } : {}),
+    ...categoryId,
     name,
     ...(typeof description === "string" ? { description } : {}),
     ...(typeof coverImage === "string" ? { coverImage } : {}),
@@ -309,6 +624,42 @@ function getLiveCommerceSdk(language?: string): Ominity | null {
   return sdk;
 }
 
+async function parseResponseBody(response: Response): Promise<unknown> {
+  if (response.status === 204) {
+    return null;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.toLowerCase().includes("json")) {
+    return response.json();
+  }
+
+  return response.text();
+}
+
+function readEmbeddedCollection(payload: unknown, key: string): ReadonlyArray<unknown> {
+  if (!isRecord(payload)) {
+    return [];
+  }
+
+  const embedded = payload._embedded;
+  if (!isRecord(embedded)) {
+    return [];
+  }
+
+  const entries = embedded[key];
+  return Array.isArray(entries) ? entries : [];
+}
+
+function logCommerceDataError(message: string, details: UnknownRecord): void {
+  const config = getStarterOminityConfig();
+  if (!config.debugLogs) {
+    return;
+  }
+
+  console.warn(`[ominity commerce] ${message}`, details);
+}
+
 async function listLiveProducts(language?: string): Promise<ReadonlyArray<StarterCommerceProductRecord>> {
   const sdk = getLiveCommerceSdk(language);
   if (!sdk) {
@@ -317,15 +668,23 @@ async function listLiveProducts(language?: string): Promise<ReadonlyArray<Starte
 
   const config = getStarterOminityConfig();
   try {
-    const response = await sdk.commerce.products.list({
-      include: "routes",
-      limit: config.commerceListLimit,
+    const response = await sdk.http.get("/commerce/products", {
+      query: {
+        include: "offers,category,groups",
+        limit: config.commerceListLimit,
+      },
     });
+    const payload = await parseResponseBody(response);
+    const items = readEmbeddedCollection(payload, "products");
 
-    return response.items
+    return items
       .map((item) => normalizeLiveProduct(item))
       .filter((item): item is StarterCommerceProductRecord => item !== null);
-  } catch {
+  } catch (error) {
+    logCommerceDataError("Failed to list live products.", {
+      ...(typeof language === "string" ? { language } : {}),
+      error,
+    });
     return [];
   }
 }
@@ -338,15 +697,22 @@ async function listLiveCategories(language?: string): Promise<ReadonlyArray<Star
 
   const config = getStarterOminityConfig();
   try {
-    const response = await sdk.commerce.categories.list({
-      include: "routes",
-      limit: config.commerceListLimit,
+    const response = await sdk.http.get("/commerce/categories", {
+      query: {
+        limit: config.commerceListLimit,
+      },
     });
+    const payload = await parseResponseBody(response);
+    const items = readEmbeddedCollection(payload, "categories");
 
-    return response.items
+    return items
       .map((item) => normalizeLiveCategory(item))
       .filter((item): item is StarterCommerceCategoryRecord => item !== null);
-  } catch {
+  } catch (error) {
+    logCommerceDataError("Failed to list live categories.", {
+      ...(typeof language === "string" ? { language } : {}),
+      error,
+    });
     return [];
   }
 }
@@ -583,10 +949,6 @@ export async function listResolvedCommerceCategories(
     }
 
     const slugSegments = routePathSegments(route);
-    if (slugSegments.length === 0) {
-      continue;
-    }
-
     result.push({
       record: category,
       locale: normalizedLocale,
