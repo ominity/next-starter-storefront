@@ -6,9 +6,9 @@ import {
   type CmsRouteObject,
 } from "@ominity/next/cms";
 
-import { getStarterChannelContext } from "@/lib/ominity/channel-context";
+import { getStarterChannelContext } from "@/lib/ominity/site";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { cmsLinkResolver, getChannelAwareCmsRouting } from "@/lib/ominity/routing";
+import { cmsLinkResolver, getChannelAwareCmsRouting } from "@/lib/ominity/site";
 
 import {
   findCommerceCategoryBySlugSegments,

@@ -1,7 +1,7 @@
 import type { CmsComponentRenderProps } from "@ominity/next/cms/rendering";
 
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { StarterRenderContext } from "@/lib/ominity/types";
+import type { CmsRenderContext as StarterRenderContext } from "@ominity/next/cms";
 
 import { asString, isOminityForm } from "./helpers";
 import { FormBlockClient } from "./form-block-client";

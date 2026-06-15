@@ -1,4 +1,4 @@
-import { getStarterChannelContext } from "@/lib/ominity/channel-context";
+import { getStarterChannelContext } from "@/lib/ominity/site";
 import { listCommerceCategories } from "@/lib/ominity/commerce";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { SiteHeaderClient } from "@/components/site/site-header-client";

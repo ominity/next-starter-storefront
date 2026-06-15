@@ -1,7 +1,7 @@
 import type { CmsComponentRenderProps } from "@ominity/next/cms/rendering";
 
 import { asString } from "@/components/cms/helpers";
-import type { StarterRenderContext } from "@/lib/ominity/types";
+import type { CmsRenderContext as StarterRenderContext } from "@ominity/next/cms";
 
 export function TextBlock({
   component,

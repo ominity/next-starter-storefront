@@ -6,7 +6,7 @@ import {
 
 import enAuthRouteSlugs from "@/locales/routes/auth/en.json";
 import nlAuthRouteSlugs from "@/locales/routes/auth/nl.json";
-import { cmsRouting } from "@/lib/ominity/routing";
+import { cmsRouting } from "@/lib/ominity/site";
 
 export type AuthUtilityRoute =
   | "login"

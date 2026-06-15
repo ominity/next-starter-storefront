@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { buildAuthFeatureMetadata, resolveAuthFeaturePage } from "@/lib/ominity/auth";
-import { generateLocaleStaticParamsForVariant } from "@/lib/ominity/locale-variant";
+import { generateLocaleStaticParamsForVariant } from "@/lib/ominity/site";
 import { AuthLoginPage } from "@/components/auth";
 
 interface LoginPageProps {

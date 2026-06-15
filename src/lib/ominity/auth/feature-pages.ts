@@ -3,9 +3,9 @@ import { matchLocaleFromSegments, normalizeLocaleCode, type CmsRoutingConfig } f
 import { buildLocalizedSlugAlternates } from "@ominity/next/next";
 
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { getStarterChannelContext } from "@/lib/ominity/channel-context";
-import { resolveLocaleForVariant, type StarterLocaleVariant } from "@/lib/ominity/locale-variant";
-import { getChannelAwareCmsRouting } from "@/lib/ominity/routing";
+import { getStarterChannelContext } from "@/lib/ominity/site";
+import { resolveLocaleForVariant, type StarterLocaleVariant } from "@/lib/ominity/site";
+import { getChannelAwareCmsRouting } from "@/lib/ominity/site";
 
 import {
   AUTH_UTILITY_ROUTES,

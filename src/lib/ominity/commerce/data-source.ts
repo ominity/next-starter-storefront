@@ -3,7 +3,7 @@ import { normalizeLocaleCode, parseLocaleCode, type CmsRouteObject } from "@omin
 import { buildLocalizedRoutePath } from "@ominity/next/next";
 
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { cmsLinkResolver, cmsRouting } from "@/lib/ominity/routing";
+import { cmsLinkResolver, cmsRouting } from "@/lib/ominity/site";
 
 import {
   MOCK_COMMERCE_CATEGORIES,

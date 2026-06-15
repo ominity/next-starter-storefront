@@ -1,12 +1,5 @@
-import { cookies } from "next/headers";
+import { createOminityAuthLogoutRouteHandler } from "@ominity/next/auth";
 
-import { clearAuthSessionCookie } from "@/lib/ominity/server/auth";
+import { getStarterAuthRouteConfig } from "@/lib/ominity/server/route-config";
 
-export async function POST(): Promise<Response> {
-  const cookieStore = await cookies();
-  clearAuthSessionCookie(cookieStore);
-
-  return Response.json({
-    ok: true,
-  });
-}
+export const POST = createOminityAuthLogoutRouteHandler(getStarterAuthRouteConfig());

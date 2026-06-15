@@ -4,7 +4,7 @@ import {
   type LocalizedSlugMap,
 } from "@ominity/next/next";
 
-import { cmsRouting } from "@/lib/ominity/routing";
+import { cmsRouting } from "@/lib/ominity/site";
 import {
   COMMERCE_UTILITY_ROUTES,
   localizedCommerceSlugMapForRoute,

@@ -6,7 +6,7 @@ import { resolveHomeLocaleRedirect } from "@ominity/next/next";
 import CmsCatchAllPage, { generateMetadata as generateCmsCatchAllMetadata } from "./(pages)/[...segment]/page";
 
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { getChannelAwareCmsRouting } from "@/lib/ominity/routing";
+import { getChannelAwareCmsRouting } from "@/lib/ominity/site";
 
 const ROOT_PARAMS = Object.freeze({ segment: [] as string[] });
 

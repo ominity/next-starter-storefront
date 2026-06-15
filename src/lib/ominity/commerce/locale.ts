@@ -3,7 +3,7 @@ import {
   resolveLocaleForVariant,
   variantMatchesCurrentStrategy as variantMatchesCurrentStrategyGeneric,
   type ResolveLocaleForVariantInput,
-} from "@/lib/ominity/locale-variant";
+} from "@/lib/ominity/site";
 
 import type { CommerceLocaleVariant } from "./types";
 

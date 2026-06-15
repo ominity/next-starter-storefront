@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 
 import {
   FormRenderer,
   createShadcnFormComponents,
+  type FormInputAdapterProps,
   tailwindDefaultTheme,
   type FormRendererProps,
 } from "@ominity/next/forms";
@@ -14,8 +15,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+function FormInput({ inputMode, ...props }: FormInputAdapterProps) {
+  return (
+      <Input
+        {...props}
+        inputMode={inputMode as ComponentProps<typeof Input>["inputMode"]}
+      />
+    );
+}
+
 const shadcnFormComponents = createShadcnFormComponents({
-  Input,
+  Input: FormInput,
   Textarea,
   Button,
 });

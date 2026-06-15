@@ -10,7 +10,7 @@ import { TextBlock } from "@/components/cms/text-block";
 import { TwoColumnSection } from "@/components/cms/two-column-section";
 
 import { getStarterOminityConfig } from "./env";
-import type { StarterRenderContext } from "./types";
+import type { CmsRenderContext as StarterRenderContext } from "@ominity/next/cms";
 
 const config = getStarterOminityConfig();
 

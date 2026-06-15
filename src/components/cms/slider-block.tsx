@@ -1,5 +1,5 @@
 import type { CmsComponentRenderProps } from "@ominity/next/cms/rendering";
-import type { StarterRenderContext } from "@/lib/ominity/types";
+import type { CmsRenderContext as StarterRenderContext } from "@ominity/next/cms";
 
 import { asString, asStringArray } from "./helpers";
 import { SliderBlockClient } from "./slider-block-client";

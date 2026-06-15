@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { buildAuthFeatureMetadata, resolveAuthFeaturePage } from "@/lib/ominity/auth";
 import { buildCommerceUtilityPaths } from "@/lib/ominity/commerce";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { generateLocaleStaticParamsForVariant } from "@/lib/ominity/locale-variant";
+import { generateLocaleStaticParamsForVariant } from "@/lib/ominity/site";
 import { AuthAccountPage } from "@/components/auth";
 
 interface AccountPageProps {

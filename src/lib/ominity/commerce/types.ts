@@ -1,5 +1,5 @@
 import type { CmsRouteObject } from "@ominity/next/cms";
-import type { StarterLocaleVariant } from "@/lib/ominity/locale-variant";
+import type { StarterLocaleVariant } from "@/lib/ominity/site";
 
 export type CommerceLocaleVariant = StarterLocaleVariant;
 

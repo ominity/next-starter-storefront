@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 import { buildCmsSitemap } from "@ominity/next/next";
 
-import { getCmsRoutes } from "@/lib/ominity/data-source";
+import { getCmsRoutes } from "@/lib/ominity/site";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { getChannelAwareCmsRouting } from "@/lib/ominity/routing";
+import { getChannelAwareCmsRouting } from "@/lib/ominity/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const config = getStarterOminityConfig();

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import type { CmsComponentRenderProps } from "@ominity/next/cms/rendering";
 
-import type { StarterRenderContext } from "@/lib/ominity/types";
+import type { CmsRenderContext as StarterRenderContext } from "@ominity/next/cms";
 
 import { asString } from "./helpers";
 

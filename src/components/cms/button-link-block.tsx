@@ -4,8 +4,8 @@ import type { Route } from "next";
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button";
-import { cmsLinkResolver } from "@/lib/ominity/routing";
-import type { StarterRenderContext } from "@/lib/ominity/types";
+import { cmsLinkResolver } from "@/lib/ominity/site";
+import type { CmsRenderContext as StarterRenderContext } from "@ominity/next/cms";
 
 import { asString } from "./helpers";
 

@@ -3,8 +3,8 @@ import { matchLocaleFromSegments, normalizeLocaleCode, type CmsRoutingConfig } f
 import { buildLocalizedSlugAlternates } from "@ominity/next/next";
 
 import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { getStarterChannelContext } from "@/lib/ominity/channel-context";
-import { getChannelAwareCmsRouting } from "@/lib/ominity/routing";
+import { getStarterChannelContext } from "@/lib/ominity/site";
+import { getChannelAwareCmsRouting } from "@/lib/ominity/site";
 
 import { generateLocaleStaticParamsForCommerceVariant, resolveLocaleForCommerceVariant } from "./locale";
 import {

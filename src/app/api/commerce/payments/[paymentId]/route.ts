@@ -1,48 +1,7 @@
-import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { getStarterCommerceClient } from "@/lib/ominity/server/commerce";
-import { jsonError } from "@/lib/ominity/server/http";
-import { resolveRequestSdkLanguage } from "@/lib/ominity/server/language";
-import { mockGetPayment } from "@/lib/ominity/server/mock-commerce";
+import { createOminityCommercePaymentRouteHandlers } from "@ominity/next/commerce";
 
-interface PaymentRouteProps {
-  params: Promise<{
-    paymentId: string;
-  }>;
-}
+import { getStarterCommerceRouteConfig } from "@/lib/ominity/server/route-config";
 
-export async function GET(request: Request, context: PaymentRouteProps): Promise<Response> {
-  const { paymentId } = await context.params;
-  if (!paymentId || paymentId.trim().length === 0) {
-    return jsonError(400, "INVALID_PAYMENT_ID", "A valid payment id is required.");
-  }
-
-  const config = getStarterOminityConfig();
-  if (config.useMockData) {
-    const payment = mockGetPayment(paymentId);
-    if (!payment) {
-      return jsonError(404, "PAYMENT_NOT_FOUND", "Payment was not found.");
-    }
-
-    return Response.json({
-      payment,
-      mode: "mock",
-    });
-  }
-
-  try {
-    const language = await resolveRequestSdkLanguage(request);
-    const client = getStarterCommerceClient(language);
-    const payment = await client.getPayment({
-      id: paymentId,
-    });
-    if (!payment) {
-      return jsonError(404, "PAYMENT_NOT_FOUND", "Payment was not found.");
-    }
-
-    return Response.json({
-      payment,
-    });
-  } catch {
-    return jsonError(404, "PAYMENT_NOT_FOUND", "Payment was not found.");
-  }
-}
+export const { GET } = createOminityCommercePaymentRouteHandlers(
+  getStarterCommerceRouteConfig(),
+);

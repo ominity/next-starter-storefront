@@ -18,12 +18,12 @@ import {
   type CmsRoutingConfig,
 } from "@ominity/next/cms";
 
-import { getStarterChannelContext } from "@/lib/ominity/channel-context";
-import { getCmsClient, getCmsRoutes } from "@/lib/ominity/data-source";
+import { getStarterChannelContext } from "@/lib/ominity/site";
+import { getCmsClient, getCmsRoutes } from "@/lib/ominity/site";
 import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { cmsRegistry, cmsRendererOptions } from "@/lib/ominity/registry";
-import { getChannelAwareCmsRouting } from "@/lib/ominity/routing";
-import type { StarterRenderContext } from "@/lib/ominity/types";
+import { getChannelAwareCmsRouting } from "@/lib/ominity/site";
+import type { CmsRenderContext as StarterRenderContext } from "@ominity/next/cms";
 
 export const dynamicParams = true;
 export const revalidate = 300;
