@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { resolveUiDictionary } from "@/lib/i18n/ui-dictionary";
 
 function FormInput({ inputMode, ...props }: FormInputAdapterProps) {
   return (
@@ -39,6 +40,7 @@ interface FormBlockClientProps {
 
 export function FormBlockClient({ form, locale, title, description }: FormBlockClientProps) {
   const [submitted, setSubmitted] = useState(false);
+  const dictionary = resolveUiDictionary(locale);
 
   return (
     <Card>
@@ -49,7 +51,7 @@ export function FormBlockClient({ form, locale, title, description }: FormBlockC
       <CardContent>
         {submitted ? (
           <div className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Your message has been sent successfully.
+            {dictionary.forms.status.submitSuccess}
           </div>
         ) : null}
 
@@ -57,6 +59,7 @@ export function FormBlockClient({ form, locale, title, description }: FormBlockC
           form={form}
           submitUrl="/api/forms/submit"
           locale={locale}
+          messages={dictionary.forms}
           styled
           themeOverride={tailwindDefaultTheme}
           components={shadcnFormComponents}

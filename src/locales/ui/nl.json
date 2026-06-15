@@ -11,5 +11,27 @@
   "switcher": {
     "languageLabel": "Taal",
     "countryLabel": "Land"
+  },
+  "forms": {
+    "validation": {
+      "invalid": "{field} is ongeldig.",
+      "required": "{field} is verplicht.",
+      "minLength": "{field} moet minstens {min} tekens bevatten.",
+      "maxLength": "{field} mag maximaal {max} tekens bevatten.",
+      "email": "Voer een geldig e-mailadres in.",
+      "phone": "Voer een geldig telefoonnummer in.",
+      "recaptcha": "Voltooi de beveiligingscontrole."
+    },
+    "status": {
+      "processError": "Het formulier kan nu niet verwerkt worden.",
+      "submissionBlocked": "De verzending is geblokkeerd.",
+      "securityUnavailable": "De beveiligingscontrole is niet beschikbaar.",
+      "submitFailed": "Er is iets misgegaan. Probeer het opnieuw.",
+      "submitUnavailable": "Het formulier kan niet verzonden worden.",
+      "submitSuccess": "Je bericht is succesvol verzonden."
+    },
+    "accessibility": {
+      "honeypotLabel": "Laat dit veld leeg"
+    }
   }
 }

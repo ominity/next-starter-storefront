@@ -11,5 +11,27 @@
   "switcher": {
     "languageLabel": "Language",
     "countryLabel": "Country"
+  },
+  "forms": {
+    "validation": {
+      "invalid": "{field} is invalid.",
+      "required": "{field} is required.",
+      "minLength": "{field} must be at least {min} characters.",
+      "maxLength": "{field} must be at most {max} characters.",
+      "email": "Enter a valid email address.",
+      "phone": "Enter a valid phone number.",
+      "recaptcha": "Complete the security check."
+    },
+    "status": {
+      "processError": "Unable to process form.",
+      "submissionBlocked": "Submission blocked.",
+      "securityUnavailable": "Security check is unavailable.",
+      "submitFailed": "Something went wrong. Please try again.",
+      "submitUnavailable": "Unable to submit form.",
+      "submitSuccess": "Your message has been sent successfully."
+    },
+    "accessibility": {
+      "honeypotLabel": "Leave this field empty"
+    }
   }
 }
