@@ -28,9 +28,9 @@ This starter is designed for long-term maintainability across multiple websites.
 ## Quick start
 
 ```bash
-pnpm install
+npm install
 cp .env.example .env.local
-pnpm dev
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -50,11 +50,11 @@ The API key identifies the current channel through `/channels/current`. Channel 
 
 ## Scripts
 
-- `pnpm dev` – run local dev server
-- `pnpm build` – production build
-- `pnpm start` – run production server
-- `pnpm lint` – lint code
-- `pnpm typecheck` – run TypeScript checks
+- `npm run dev` – run local dev server
+- `npm run build` – production build
+- `npm run start` – run production server
+- `npm run lint` – lint code
+- `npm run typecheck` – run TypeScript checks
 
 ## Architecture
 

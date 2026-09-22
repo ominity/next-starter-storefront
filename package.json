@@ -2,8 +2,9 @@
   "name": "ominity-next-starter",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Production-ready Next.js App Router starter for @ominity/next",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "npm@11.8.0",
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",

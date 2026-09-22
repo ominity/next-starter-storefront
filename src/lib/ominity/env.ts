@@ -173,7 +173,7 @@ export const getStarterOminityConfig = (): StarterOminityConfig => {
     debugLogs: toBoolean(process.env.OMINITY_DEBUG_LOGS, false),
     devTool: toBoolean(
       process.env.OMINITY_DEV_TOOL,
-      toBoolean(process.env.OMINITY_DEBUG_BAR, (process.env.NODE_ENV ?? "development") !== "production"),
+      (process.env.NODE_ENV ?? "development") !== "production",
     ),
     strictMissingComponents: toBoolean(process.env.OMINITY_STRICT_COMPONENTS, true),
     ...(typeof process.env.OMINITY_API_URL === "string"
