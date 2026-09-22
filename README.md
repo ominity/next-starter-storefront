@@ -155,10 +155,12 @@ The starter uses `@ominity/next/forms` for rendering/submission and
 ## Production checklist
 
 - [ ] Set `OMINITY_USE_MOCK_DATA=false`
+- [ ] Set `OMINITY_API_URL` and `OMINITY_API_KEY`
 - [ ] Configure API env vars and locale strategy
-- [ ] Configure `OMINITY_AUTH_CLIENT_ID`, `OMINITY_AUTH_CLIENT_SECRET`, `OMINITY_AUTH_SESSION_SECRET`
+- [ ] Configure `OMINITY_AUTH_CLIENT_ID`, `OMINITY_AUTH_CLIENT_SECRET`, `OMINITY_AUTH_SESSION_SECRET` if auth flows are used
 - [ ] Decide whether `OMINITY_FEATURE_CUSTOMER_ACCOUNTS` and its invitation/team UI are needed
 - [ ] Decide `OMINITY_CHECKOUT_ALLOW_GUEST` policy
+- [ ] Enable `OMINITY_TRACKING_ENABLED` when visitor/event tracking should be sent to Ominity
 - [ ] Configure `NEXT_PUBLIC_SITE_URL`
 - [ ] Configure `OMINITY_DRAFT_TOKEN`
 - [ ] Configure reCAPTCHA keys (if forms use anti-bot)

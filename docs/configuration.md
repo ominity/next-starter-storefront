@@ -44,6 +44,7 @@ The authenticated `/channels/current` response is the source of truth for the cu
 | Variable | Purpose | Default |
 |---|---|---|
 | `OMINITY_REVALIDATE_SECONDS` | ISR interval for page route | `300` |
+| `OMINITY_TRACKING_ENABLED` | Enable browser tracking through `/api/omt` in live API mode | `false` |
 | `OMINITY_DEBUG_LOGS` | SDK/client debug logging | `false` |
 | `OMINITY_STRICT_COMPONENTS` | Throw on unregistered CMS keys | `true` |
 

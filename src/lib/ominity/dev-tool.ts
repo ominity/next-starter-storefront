@@ -109,6 +109,7 @@ export const createStarterDevToolSnapshot = (
     { label: "Payment", value: config.enableCommercePayment, status: config.enableCommercePayment ? "enabled" : "disabled" },
     { label: "Auth", value: config.enableAuth, status: config.enableAuth ? "enabled" : "disabled" },
     { label: "Customer accounts", value: config.enableCustomerAccounts, status: config.enableCustomerAccounts ? "enabled" : "disabled" },
+    { label: "Tracking", value: config.trackingEnabled, status: config.trackingEnabled ? "enabled" : "disabled" },
   ];
   const displayedApiUrl = config.apiUrl
     ?? (config.useMockData ? "Not used in mock mode" : undefined);

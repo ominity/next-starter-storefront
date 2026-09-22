@@ -11,6 +11,7 @@ import { getStarterDevToolChannelInfo } from "@/lib/ominity/site";
 import "./globals.css";
 
 const config = getStarterOminityConfig();
+const trackingEnabled = config.trackingEnabled && !config.useMockData && Boolean(config.apiUrl && config.apiKey);
 
 export const metadata: Metadata = {
   metadataBase: new URL(config.siteUrl),
@@ -26,6 +27,11 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const channel = await getStarterDevToolChannelInfo();
   const devToolSnapshot = createStarterDevToolSnapshot(config, channel);
+  const trackingChannelId = typeof channel?.id === "string"
+    ? channel.id
+    : typeof channel?.id === "number"
+      ? String(channel.id)
+      : undefined;
 
   return (
     <html lang={channel?.defaultLocale ?? "en"} suppressHydrationWarning>
@@ -34,6 +40,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           devToolEnabled={config.devTool}
           devToolSnapshot={devToolSnapshot}
           customerAccountsEnabled={config.enableCustomerAccounts}
+          trackingEnabled={trackingEnabled}
+          channelId={trackingChannelId}
         >
           <div className="relative flex min-h-screen flex-col">
             <SiteHeader />

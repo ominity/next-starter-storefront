@@ -100,6 +100,7 @@ export interface StarterOminityConfig {
   readonly nodeEnv: string;
   readonly siteUrl: string;
   readonly useMockData: boolean;
+  readonly trackingEnabled: boolean;
   readonly debugLogs: boolean;
   readonly devTool: boolean;
   readonly strictMissingComponents: boolean;
@@ -168,6 +169,7 @@ export const getStarterOminityConfig = (): StarterOminityConfig => {
     nodeEnv: process.env.NODE_ENV ?? "development",
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
     useMockData: toBoolean(process.env.OMINITY_USE_MOCK_DATA, true),
+    trackingEnabled: toBoolean(process.env.OMINITY_TRACKING_ENABLED, false),
     debugLogs: toBoolean(process.env.OMINITY_DEBUG_LOGS, false),
     devTool: toBoolean(
       process.env.OMINITY_DEV_TOOL,
