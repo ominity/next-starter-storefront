@@ -1,13 +1,12 @@
 import type { CmsRendererOptions } from "@ominity/next/cms/rendering";
 import { createCmsRegistry, defineCmsComponent } from "@ominity/next/cms/rendering";
 
-import { ButtonLinkBlock } from "@/components/cms/button-link-block";
+import { ButtonBlock } from "@/components/cms/button-block";
+import { createColumnSection } from "@/components/cms/column-section";
 import { FormBlock } from "@/components/cms/form-block";
-import { HeroBlock } from "@/components/cms/hero-block";
-import { RichTextBlock } from "@/components/cms/rich-text-block";
-import { SliderBlock } from "@/components/cms/slider-block";
+import { ImageBlock } from "@/components/cms/image-block";
 import { TextBlock } from "@/components/cms/text-block";
-import { TwoColumnSection } from "@/components/cms/two-column-section";
+import { UnknownBlock } from "@/components/cms/unknown-block";
 
 import { getStarterOminityConfig } from "./env";
 import type { CmsRenderContext as StarterRenderContext } from "@ominity/next/cms";
@@ -15,22 +14,19 @@ import type { CmsRenderContext as StarterRenderContext } from "@ominity/next/cms
 const config = getStarterOminityConfig();
 
 export const cmsRegistry = createCmsRegistry<StarterRenderContext>([
-  defineCmsComponent("hero", HeroBlock),
-  defineCmsComponent("button_link", ButtonLinkBlock),
-  defineCmsComponent("rich_text", RichTextBlock),
   defineCmsComponent("text-block", TextBlock),
-  defineCmsComponent("slider", SliderBlock),
+  defineCmsComponent("button", ButtonBlock),
+  defineCmsComponent("image", ImageBlock),
+  defineCmsComponent("1-column-section", createColumnSection(1)),
+  defineCmsComponent("2-column-section", createColumnSection(2)),
+  defineCmsComponent("3-column-section", createColumnSection(3)),
+  defineCmsComponent("4-column-section", createColumnSection(4)),
+  defineCmsComponent("5-column-section", createColumnSection(5)),
+  defineCmsComponent("6-column-section", createColumnSection(6)),
   defineCmsComponent("form_block", FormBlock),
-  defineCmsComponent("2-column-section", TwoColumnSection),
 ]);
 
 export const cmsRendererOptions: CmsRendererOptions<StarterRenderContext> = {
-  missingComponent: config.strictMissingComponents
-    ? "throw"
-    : (component) => (
-      <div className="rounded-md border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        Unknown CMS block key: <strong>{component.key}</strong>
-      </div>
-    ),
+  missingComponent: config.strictMissingComponents ? "throw" : UnknownBlock,
   unsupportedValue: "ignore",
 };
