@@ -3,15 +3,9 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCart } from "@ominity/next/react";
+import { useState } from "react";
 
-import { useCommerce } from "@/components/commerce/commerce-provider";
-import {
-  commerceCartItemId,
-  commerceCartItemQuantity,
-  commerceCartItemTitle,
-  commerceCartItemTotalPrice,
-} from "@ominity/next/commerce";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Drawer,
@@ -23,12 +17,11 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
-import { formatMoney } from "@/lib/ominity/commerce";
+import { formatAmount } from "@/lib/format";
 
 export interface CartDrawerProps {
   readonly cartPath: string;
   readonly checkoutPath: string;
-  readonly checkoutEnabled: boolean;
   readonly title: string;
   readonly emptyText: string;
   readonly checkoutText: string;
@@ -36,13 +29,8 @@ export interface CartDrawerProps {
 }
 
 export function CartDrawer(props: CartDrawerProps) {
-  const commerce = useCommerce();
+  const cart = useCart();
   const [open, setOpen] = useState(false);
-
-  const subtotal = useMemo(
-    () => formatMoney(commerce.cartSubtotal, commerce.cartCurrency),
-    [commerce.cartSubtotal, commerce.cartCurrency],
-  );
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
@@ -53,9 +41,9 @@ export function CartDrawer(props: CartDrawerProps) {
           aria-label={props.title}
         >
           <ShoppingCart className="h-4 w-4" />
-          {commerce.cartCount > 0 && (
+          {cart.count > 0 && (
             <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
-              {commerce.cartCount > 99 ? "99+" : commerce.cartCount}
+              {cart.count > 99 ? "99+" : cart.count}
             </span>
           )}
         </button>
@@ -65,29 +53,29 @@ export function CartDrawer(props: CartDrawerProps) {
         <DrawerHeader>
           <DrawerTitle>{props.title}</DrawerTitle>
           <DrawerDescription>
-            {commerce.cartCount} item(s) · {subtotal}
+            {cart.count} item(s) · {formatAmount(cart.cart?.subtotalAmount)}
           </DrawerDescription>
         </DrawerHeader>
 
         <div className="max-h-[56vh] overflow-auto px-4">
-          {commerce.cart.length === 0 ? (
+          {cart.items.length === 0 ? (
             <p className="pb-4 text-sm text-muted-foreground">{props.emptyText}</p>
           ) : (
             <div className="space-y-3 pb-2">
-              {commerce.cart.slice(0, 6).map((item) => (
-                <div key={commerceCartItemId(item)} className="rounded border p-3">
+              {cart.items.slice(0, 6).map((item) => (
+                <div key={item.id} className="rounded border p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <p className="text-sm font-medium">{commerceCartItemTitle(item)}</p>
+                      <p className="text-sm font-medium">{item.product?.title ?? `Product ${item.productId}`}</p>
                       <p className="text-xs text-muted-foreground">
-                        Qty {commerceCartItemQuantity(item)} · {formatMoney(commerceCartItemTotalPrice(item), commerce.cartCurrency)}
+                        Qty {item.quantity} · {formatAmount(item.totalAmount)}
                       </p>
                     </div>
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={() => { void commerce.removeFromCart(commerceCartItemId(item)); }}
+                      onClick={() => { void cart.remove(item.id); }}
                     >
                       Remove
                     </Button>
@@ -106,15 +94,13 @@ export function CartDrawer(props: CartDrawerProps) {
           >
             {props.viewCartText}
           </Link>
-          {props.checkoutEnabled && (
-            <Link
-              href={props.checkoutPath as Route}
-              onClick={() => setOpen(false)}
-              className={cn(buttonVariants({ variant: "default" }), "w-full")}
-            >
-              {props.checkoutText}
-            </Link>
-          )}
+          <Link
+            href={props.checkoutPath as Route}
+            onClick={() => setOpen(false)}
+            className={cn(buttonVariants({ variant: "default" }), "w-full")}
+          >
+            {props.checkoutText}
+          </Link>
         </DrawerFooter>
       </DrawerContent>
     </Drawer>

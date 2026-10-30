@@ -1,49 +1,86 @@
 # Auth
 
-The starter keeps credentials and access tokens behind same-origin route handlers while `@ominity/next` owns auth state and request behavior.
+Sign-in, MFA and the user's own settings come from `@ominity/next`: the routes keep credentials and tokens on the
+server, and the pages in `src/components/auth` and `src/components/account` use `useAuth`, `useUser` and
+`useLoginActivity` from `@ominity/next/react`. The user is the SDK `User`; the starter defines no auth types.
 
-## Included flows
+## Pages
 
-- password login and normal user registration
-- encrypted, HttpOnly auth session cookies and refresh
-- password reset request and completion pages
-- MFA verification through TOTP, email, SMS, or recovery code
-- enabled social-provider discovery and OAuth callback completion
-- current-user login activity, including successful password, registration, and linked social-provider sign-ins
-- customer invitation authentication through the normal login and registration endpoints
+Paths come from `src/locales/routes/{lang}.json` and follow the locale strategy:
 
-The branded pages live in `src/components/auth`. Server routes remain thin calls to the factories exported by `@ominity/next/auth/server`.
+| Key | Default | Component |
+|---|---|---|
+| `login` | `auth/login` | `AuthLoginPage`: password sign-in and social providers (`social-login-options.tsx`) |
+| `register` | `auth/register` | `AuthRegisterPage`, with a password strength bar |
+| `mfa` | `auth/mfa` | `AuthMfaPage`: the second step of a sign-in |
+| `forgotPassword` | `auth/forgot-password` | `AuthForgotPasswordPage` |
+| `resetPassword` | `auth/reset-password` | `AuthResetPasswordPage` (reads `email` and `token` from the link) |
+| `account` | `account` | `AuthAccountPage`: customer account dashboard and `AccountSecurity` |
+
+Login, MFA and the cart pass a safe `returnTo` path along, so a shopper lands back where they started.
 
 ## Routes
 
-| Method | Route | Purpose |
-|---|---|---|
-| `POST` | `/api/auth/login` | Password sign-in |
-| `POST` | `/api/auth/register` | Normal user registration |
-| `POST` | `/api/auth/logout` | Clear the session |
-| `GET` | `/api/auth/me` | Restore the browser session |
-| `POST` | `/api/auth/refresh` | Refresh OAuth tokens in the encrypted session |
-| `GET` | `/api/auth/social/*` | Provider discovery, OAuth start, and callback |
-| `GET` | `/api/auth/login-activity/*` | Current-user activity list and detail |
-| `GET/POST` | `/api/auth/mfa/*` | MFA methods, challenges, and verification |
-| `POST` | `/api/auth/password/forgot` | Send a reset email |
-| `POST` | `/api/auth/password/reset` | Complete a reset |
+`src/app/api/[...ominity]/route.ts` serves `/api/auth/*` through `createOminityRouteHandlers`: login, register,
+logout, `me`, refresh, MFA, password reset, login activity and social login. Social sign-in returns to the localized
+account page of the channel's default locale, to the MFA page when the user still needs a second factor, or to the
+login page on failure:
 
-## MFA flow
+```ts
+auth: {
+  socialLoginSuccessPath: () => defaultLocalePath("account"),
+  socialLoginFailurePath: () => defaultLocalePath("login"),
+  socialLoginMfaPath: () => defaultLocalePath("mfa"),
+},
+```
 
-1. The user signs in through the regular login endpoint.
-2. `OminityAuthProvider` loads the available MFA methods.
-3. A required challenge redirects to the existing MFA page with a safe `returnTo` path.
-4. After verification, the user continues to the account or invitation page.
+`OminityProvider` in `src/components/providers.tsx` holds the auth state for every page.
+
+## Sign-in and MFA
+
+`AuthLoginPage` calls `auth.signIn({ email, password })`. For a user with MFA the result is `mfa_required` and the
+page continues to `auth/mfa`:
+
+```tsx
+const result = await auth.signIn({ email, password });
+router.replace(result.status === "mfa_required" ? `${paths.mfa}?returnTo=…` : returnTo);
+```
+
+`AuthMfaPage` offers the methods in `auth.mfaMethods` plus a recovery code, sends email and SMS codes with
+`auth.sendMfaCode(method)` and completes the sign-in with `auth.verifyMfa(method, code)` or
+`auth.verifyRecoveryCode(code)`. Until then the session is pending: the server treats the browser as signed out for
+the account, cart and SDK requests. "Cancel and sign out" calls `auth.signOut()`.
+
+## Password reset
+
+`AuthForgotPasswordPage` calls `auth.requestPasswordReset({ email, redirectUrl })` with the localized reset page as
+`redirectUrl`; `AuthResetPasswordPage` completes it with `auth.resetPassword({ email, token, password })`.
 
 ## Social login
 
-The login page loads enabled providers from `/api/auth/social` and links to the package-owned start route. The callback exchanges its one-time code on the server, creates the encrypted user session, records login activity, and redirects to the localized account page. Provider identities must already be linked to an Ominity user; the application never links accounts by email automatically.
+`SocialLoginOptions` loads the enabled providers with `auth.listSocialProviders()` and links each to
+`auth.socialSignInUrl(provider.id)`. The callback exchanges its one-time code on the server, creates the session,
+records login activity and redirects to the account page (or the MFA page). Provider identities must already be linked to an Ominity
+user; accounts are never linked by email. On failure the login page shows the `socialError` code.
+
+## Account security
+
+`AccountSecurity` (`src/components/account/account-security.tsx`) is built on `useUser` and `useLoginActivity`:
+
+- profile changes with `profile.update({ firstName, lastName, email })`;
+- MFA per method: `enableMfa(method)` (for `totp` with the QR code and secret from `details`), `confirmMfa(method,
+  code)`, `disableMfa(method)`;
+- new recovery codes with `regenerateRecoveryCodes()`;
+- recent sign-ins from `useLoginActivity({ pageSize: 10 })`, page by page.
 
 ## Security boundary
 
-The browser never receives the OAuth client secret, Ominity API key, user access token, or refresh token. Login activity routes derive the user ID and access token from the encrypted session. The `.env.example` session secret is a placeholder and must be replaced in production.
+The browser never receives the OAuth client secret, the Ominity API key or the user's access and refresh tokens.
+`.env.example`'s session secret is a placeholder and must be replaced in production. With the dev tool on, auth
+requests are not shown in its request log.
 
 ## Removing auth
 
-Set `OMINITY_FEATURE_AUTH=false`, then remove `src/app/(auth)`, `src/components/auth`, the auth API routes, and the auth provider when the project does not need user accounts. Customer accounts depend on auth and are disabled automatically by the runtime config.
+Pass `auth: false` and `customerAccounts: false` to `createOminityRouteHandlers`, remove the auth and account entries
+from `src/locales/routes/*.json` and their views (`_views/auth.tsx`, `_views/account.tsx`, and the entries in `src/app/[[...path]]/_views/index.ts`), and delete
+`src/components/auth` and `src/components/account`.

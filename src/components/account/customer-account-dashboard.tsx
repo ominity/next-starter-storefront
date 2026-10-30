@@ -1,6 +1,6 @@
 "use client";
 
-import { useOminityCustomerAccounts } from "@ominity/next/customer-accounts/react";
+import { useCustomer } from "@ominity/next/react";
 
 import { AccountSwitcher } from "./account-switcher";
 import { CustomerAccountProfile } from "./customer-account-profile";
@@ -13,7 +13,7 @@ export interface CustomerAccountDashboardProps {
 }
 
 export function CustomerAccountDashboard({ language }: CustomerAccountDashboardProps) {
-  const accounts = useOminityCustomerAccounts();
+  const accounts = useCustomer();
 
   if (!accounts.ready) {
     return (
@@ -32,7 +32,7 @@ export function CustomerAccountDashboard({ language }: CustomerAccountDashboardP
             type="button"
             className="text-sm font-medium text-primary hover:underline"
             onClick={() => {
-              void accounts.refreshContext().catch(() => undefined);
+              void accounts.refresh().catch(() => undefined);
             }}
           >
             Try again
@@ -42,7 +42,7 @@ export function CustomerAccountDashboard({ language }: CustomerAccountDashboardP
     );
   }
 
-  if (!accounts.activeMembership) {
+  if (!accounts.membership) {
     return (
       <Card>
         <CardContent className="pt-6 text-sm text-muted-foreground">
@@ -52,8 +52,8 @@ export function CustomerAccountDashboard({ language }: CustomerAccountDashboardP
     );
   }
 
-  const activeName = accounts.activeMembership.customer?.name
-    ?? `Account ${accounts.activeMembership.customerId}`;
+  const activeName = accounts.membership.customer?.name
+    ?? `Account ${accounts.membership.customerId}`;
 
   return (
     <section className="space-y-6">
@@ -62,14 +62,14 @@ export function CustomerAccountDashboard({ language }: CustomerAccountDashboardP
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active customer</p>
           <h2 className="mt-1 text-xl font-semibold">{activeName}</h2>
           <p className="text-sm text-muted-foreground">
-            {accounts.activeMembership.role?.name ?? "Customer member"}
-            {accounts.activeMembership.isOwner ? " · Owner" : ""}
+            {accounts.membership.role?.name ?? "Customer member"}
+            {accounts.membership.isOwner ? " · Owner" : ""}
           </p>
         </div>
         <AccountSwitcher />
       </div>
 
-      <CustomerAccountProfile key={accounts.activeCustomerId} />
+      <CustomerAccountProfile key={accounts.customerId} />
       <CustomerAccountTeam language={language} />
       <CustomerAccountResources />
     </section>

@@ -1,0 +1,16 @@
+{
+  "login": "auth/login",
+  "register": "auth/register",
+  "mfa": "auth/mfa",
+  "forgotPassword": "auth/forgot-password",
+  "resetPassword": "auth/reset-password",
+  "account": "account",
+  "invitation": "account/invitations/{token}",
+  "products": "products",
+  "cart": "cart",
+  "wishlist": "wishlist",
+  "checkout": "checkout",
+  "payment": "payment",
+  "product": "p/{sku}-{slug}",
+  "category": "c/{slug}"
+}

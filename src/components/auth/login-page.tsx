@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-import { useAuth } from "./auth-provider";
+import { useAuth } from "@ominity/next/react";
 import { InputPassword } from "./input-password";
 import { SocialLoginOptions } from "./social-login-options";
 
@@ -56,7 +56,7 @@ export function AuthLoginPage(props: AuthLoginPageProps) {
         ? props.returnTo
         : props.paths.account;
 
-      if (result.requiresMfa) {
+      if (result.status === "mfa_required") {
         const target = `${props.paths.mfa}?returnTo=${encodeURIComponent(safeReturnTo)}`;
         router.replace(target as Route);
         return;
@@ -77,24 +77,26 @@ export function AuthLoginPage(props: AuthLoginPageProps) {
         <CardDescription>Sign in with your account credentials.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Input
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="Email"
-          type="email"
-          autoComplete="email"
-          disabled={submitting}
-        />
-        <InputPassword
-          value={password}
-          onChange={setPassword}
-          placeholder="Password"
-          autoComplete="current-password"
-          disabled={submitting}
-        />
-        <Button disabled={submitting} onClick={() => { void submit(); }}>
-          {submitting ? "Signing in…" : "Login"}
-        </Button>
+        <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+          <Input
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="Email"
+            type="email"
+            autoComplete="email"
+            disabled={submitting}
+          />
+          <InputPassword
+            value={password}
+            onChange={setPassword}
+            placeholder="Password"
+            autoComplete="current-password"
+            disabled={submitting}
+          />
+          <Button type="submit" disabled={submitting}>
+            {submitting ? "Signing in…" : "Login"}
+          </Button>
+        </form>
         {props.socialError && (
           <p className="text-sm text-destructive">
             Social sign-in could not be completed ({props.socialError.replaceAll("_", " ").toLowerCase()}).

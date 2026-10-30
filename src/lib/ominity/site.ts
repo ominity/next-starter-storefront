@@ -1,132 +1,65 @@
 import {
   createRoutingConfig,
+  normalizeLocaleCode,
+  parseLocaleCode,
   type CmsRouteLinkResolver,
+  type CmsRouteObject,
 } from "@ominity/next/cms";
-import {
-  buildLocalizedRoutePath,
-  createOminitySiteSupport,
-  type OminityChannelContext,
-  type OminityLocaleVariant,
-  type ResolveLocaleForVariantInput,
-} from "@ominity/next/next";
+import { createOminitySiteSupport } from "@ominity/next/next";
 
-import { localizedCommerceTemplateMapForRoute } from "./commerce/route-translations";
-import { getStarterOminityConfig } from "./env";
-import { mockCmsClient } from "./mock-data";
+import { config } from "./config";
+import { routePath, type RouteName } from "./routes";
 
-function normalizePathSegments(value: unknown): ReadonlyArray<string> {
-  if (Array.isArray(value)) {
-    return value
-      .flatMap((entry) => `${entry}`.split("/"))
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
-  }
-
-  if (typeof value === "string") {
-    return value
-      .split("/")
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
-  }
-
-  if (typeof value === "number") {
-    return [`${value}`];
-  }
-
-  return [];
+/** Product and category links follow the starter's localized templates; the link resolver adds the locale prefix. */
+function templateResolver(name: RouteName): CmsRouteLinkResolver {
+  return ({ route, locale }) => {
+    const slug = route.parameters.slug;
+    const segments = (Array.isArray(slug) ? slug : String(slug ?? "").split("/")).map(String).filter(Boolean);
+    const routing = createRoutingConfig({ defaultLocale: locale, locales: [], localeSegmentStrategy: "none" });
+    return routePath(name, locale, routing, name === "product"
+      ? { sku: String(route.parameters.sku ?? ""), slug: segments.join("-") }
+      : { slug: segments });
+  };
 }
 
-const config = getStarterOminityConfig();
-const productTemplateByLocale = localizedCommerceTemplateMapForRoute("product");
-const categoryTemplateByLocale = localizedCommerceTemplateMapForRoute("category");
-function createCmsRouteTemplateRouting(locale: string) {
-  return createRoutingConfig({
-    defaultLocale: locale,
-    locales: [],
-    localeSegmentStrategy: "none",
+const site = createOminitySiteSupport({
+  getConfig: () => ({
+    apiUrl: config.apiUrl,
+    ...(config.apiKey ? { apiKey: config.apiKey } : {}),
+    debugLogs: config.debugLogs,
+    devTool: config.devTool,
+    localeSegmentStrategy: config.localeSegmentStrategy,
     canonicalRedirectPolicy: config.canonicalRedirectPolicy,
-    trailingSlash: false,
-    basePath: "",
-  });
-}
-
-function resolveProductRoutePath(parameters: Readonly<Record<string, unknown>>, locale: string): string {
-  const skuValue = parameters.sku;
-  const sku = typeof skuValue === "number"
-    ? `${skuValue}`
-    : typeof skuValue === "string"
-      ? skuValue.trim()
-      : "";
-  if (sku.length === 0) {
-    throw new Error("Product route requires parameters.sku");
-  }
-
-  const slugSegments = normalizePathSegments(parameters.slug);
-  if (slugSegments.length === 0) {
-    throw new Error("Product route requires parameters.slug");
-  }
-
-  const slug = slugSegments.join("-");
-  return buildLocalizedRoutePath({
-    routing: createCmsRouteTemplateRouting(locale),
-    locale,
-    templateByLocale: productTemplateByLocale,
-    params: {
-      sku,
-      slug,
-    },
-  });
-}
-
-function resolveCategoryRoutePath(parameters: Readonly<Record<string, unknown>>, locale: string): string {
-  const slugSegments = normalizePathSegments(parameters.slug);
-  if (slugSegments.length === 0) {
-    throw new Error("Category route requires parameters.slug");
-  }
-
-  return buildLocalizedRoutePath({
-    routing: createCmsRouteTemplateRouting(locale),
-    locale,
-    templateByLocale: categoryTemplateByLocale,
-    params: {
-      slug: [...slugSegments],
-    },
-  });
-}
-
-const commerceRouteResolvers: Readonly<Record<string, CmsRouteLinkResolver>> = {
-  product: (context) => resolveProductRoutePath(context.route.parameters, context.locale),
-  category: (context) => resolveCategoryRoutePath(context.route.parameters, context.locale),
-};
-
-const support = createOminitySiteSupport({
-  getConfig: getStarterOminityConfig,
-  mockClient: mockCmsClient,
-  routeResolvers: commerceRouteResolvers,
+    stringLinkStrategy: config.stringLinkStrategy,
+    trailingSlash: config.trailingSlash,
+    basePath: config.basePath,
+    homeLocaleRedirectCookieName: config.homeLocaleRedirectCookieName,
+  }),
+  routeResolvers: {
+    product: templateResolver("product"),
+    category: templateResolver("category"),
+  },
 });
 
-export type StarterChannelContext = OminityChannelContext;
-export type StarterLocaleVariant = OminityLocaleVariant;
-export type { ResolveLocaleForVariantInput };
+export const cmsLinkResolver = site.cmsLinkResolver;
+export const getCmsClient = site.getCmsClient;
+export const getCmsRoutes = site.getCmsRoutes;
+/** Routing for the current channel's languages and the configured locale strategy. */
+export const getRouting = site.getChannelAwareCmsRouting;
+/** Languages, countries and currencies of the current channel. */
+export const getChannel = site.getChannelContext;
+export const getDevToolChannelInfo = site.getDevToolChannelInfo;
+export const getDevToolHttpClient = site.getDevToolHttpClient;
+export const resolveRequestSdkLanguage = site.resolveRequestSdkLanguage;
+export const resolveRequestCountry = site.resolveRequestCountry;
 
-export const cmsRouting = support.cmsRouting;
-export const cmsLinkResolver = support.cmsLinkResolver;
-export const cmsLocalizedStringLinkResolver = support.cmsLocalizedStringLinkResolver;
-export const getOminityDevToolHttpClient = support.getDevToolHttpClient;
-export const getLiveCmsClient = support.getLiveCmsClient;
-export const getCmsClient = support.getCmsClient;
-export const getCmsPageByPath = support.getCmsPageByPath;
-export const getCmsRoutes = support.getCmsRoutes;
-export const getCmsMenus = support.getCmsMenus;
-export const getMainMenu = support.getMainMenu;
-export const getStarterChannelContext = support.getChannelContext;
-export const getStarterDevToolChannelInfo = support.getDevToolChannelInfo;
-export const getSupportedChannelLocales = support.getSupportedLocales;
-export const getChannelAwareCmsRouting = support.getChannelAwareCmsRouting;
-export const resolveRequestLocale = support.resolveRequestLocale;
-export const resolveRequestSdkLanguage = support.resolveRequestSdkLanguage;
-export const resolveRequestCountry = support.resolveRequestCountry;
-export const variantMatchesCurrentStrategy = support.variantMatchesCurrentStrategy;
-export const resolveLocaleForVariant = support.resolveLocaleForVariant;
-export const generateLocaleStaticParamsForVariant = support.generateLocaleStaticParamsForVariant;
-export const resetStarterOminitySiteCaches = support.resetCaches;
+/** The localized URL of anything with SDK `routes`, such as a `Product` or `Category`; null when it has no route. */
+export function linkTo(entity: { readonly routes: Readonly<Record<string, unknown>> }, locale: string): string | null {
+  const language = parseLocaleCode(normalizeLocaleCode(locale)).language;
+  const route = entity.routes[language] ?? Object.values(entity.routes)[0];
+  try {
+    return route ? cmsLinkResolver.resolve(route as CmsRouteObject, { locale }).href : null;
+  } catch {
+    return null;
+  }
+}

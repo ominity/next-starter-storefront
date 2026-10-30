@@ -1,97 +1,66 @@
 "use client";
 
-import Link from "next/link";
+import type { CmsRoutingConfig } from "@ominity/next/cms";
+import { useCart, useWishlist } from "@ominity/next/react";
 import type { Route } from "next";
+import Link from "next/link";
 
-import { useCommerce } from "@/components/commerce/commerce-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCatalogPrice } from "@/lib/ominity/commerce";
+import { formatPrice } from "@/lib/format";
+import { productPath } from "@/lib/ominity/routes";
 
 export interface CommerceWishlistPageProps {
-  readonly paths: {
-    readonly home: string;
-    readonly cart: string;
-  };
-  readonly features: {
-    readonly cart: boolean;
-  };
+  readonly paths: { readonly home: string; readonly cart: string };
+  readonly locale: string;
+  readonly routing: CmsRoutingConfig;
 }
 
-export function CommerceWishlistPage(props: CommerceWishlistPageProps) {
-  const commerce = useCommerce();
-
-  if (!commerce.ready) {
-    return (
-      <Card>
-        <CardContent className="pt-6 text-sm text-muted-foreground">Loading wishlist…</CardContent>
-      </Card>
-    );
-  }
+export function CommerceWishlistPage({ paths, locale, routing }: CommerceWishlistPageProps) {
+  const wishlist = useWishlist();
+  const cart = useCart();
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">Wishlist</CardTitle>
-          <CardDescription>{commerce.wishlist.length} saved item(s)</CardDescription>
+          <CardDescription>{wishlist.items.length} saved item(s)</CardDescription>
         </CardHeader>
       </Card>
 
-      {commerce.wishlist.length === 0 ? (
+      {wishlist.items.length === 0 ? (
         <Card>
           <CardContent className="space-y-3 pt-6">
-            <p className="text-sm text-muted-foreground">Your wishlist is empty.</p>
-            <Link href={props.paths.home as Route} className="text-sm font-medium text-primary hover:underline">
-              Continue shopping
-            </Link>
+            <p className="text-sm text-muted-foreground">Nothing saved yet.</p>
+            <Link href={paths.home as Route} className="text-sm font-medium text-primary hover:underline">Continue shopping</Link>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {commerce.wishlist.map((item) => (
-            <Card key={item.product.id}>
-              <CardHeader>
-                <CardTitle className="text-lg">{item.product.title}</CardTitle>
-                <CardDescription>SKU {item.product.sku}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm font-medium">
-                  {formatCatalogPrice(item.offers)}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {props.features.cart && (
-                    <Button
-                      size="sm"
-                      onClick={() => { void commerce.addToCart(item); }}
-                    >
-                      Add to cart
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => commerce.removeFromWishlist(String(item.product.id))}
-                  >
-                    Remove
-                  </Button>
-                  {item.canonicalPath && (
-                    <Link href={item.canonicalPath as Route} className="text-sm font-medium text-primary hover:underline">
-                      View product
-                    </Link>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {wishlist.items.map((product) => {
+            const path = productPath(product, locale, routing);
+            return (
+              <Card key={product.id}>
+                <CardHeader>
+                  <CardTitle className="text-lg">{product.title}</CardTitle>
+                  <CardDescription>SKU {product.sku}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="text-sm font-medium">{formatPrice(product.offers)}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" disabled={cart.pending} onClick={() => { void cart.add(product); }}>Add to cart</Button>
+                    <Button size="sm" variant="outline" onClick={() => wishlist.remove(product.id)}>Remove</Button>
+                    {path && <Link href={path as Route} className="text-sm font-medium text-primary hover:underline">View product</Link>}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {props.features.cart && (
-        <Link href={props.paths.cart as Route} className="text-sm font-medium text-primary hover:underline">
-          Open cart
-        </Link>
-      )}
+      <Link href={paths.cart as Route} className="text-sm font-medium text-primary hover:underline">Open cart</Link>
     </div>
   );
 }

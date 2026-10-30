@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@ominity/next/react";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -12,6 +13,7 @@ import { Label } from "@/components/ui/label";
 export function AuthForgotPasswordPage({ paths }: {
   readonly paths: { readonly login: string; readonly resetPassword: string };
 }) {
+  const auth = useAuth();
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -25,17 +27,11 @@ export function AuthForgotPasswordPage({ paths }: {
     setSubmitting(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/auth/password/forgot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          redirectUrl: new URL(paths.resetPassword, window.location.origin).toString(),
-        }),
+      await auth.requestPasswordReset({
+        email: email.trim().toLowerCase(),
+        redirectUrl: new URL(paths.resetPassword, window.location.origin).toString(),
       });
-      const result = await response.json() as { readonly message?: string; readonly error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Could not request a password reset.");
-      setMessage(result.message ?? "If the account exists, a reset link has been sent.");
+      setMessage("If the account exists, a reset link has been sent.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not request a password reset.");
     } finally {

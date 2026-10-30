@@ -1,29 +1,19 @@
 # Ominity Next Starter
 
-Production-ready Next.js App Router starter that integrates [`@ominity/next`](https://www.npmjs.com/package/@ominity/next) with:
+A Next.js App Router starter for [`@ominity/next`](https://www.npmjs.com/package/@ominity/next): CMS pages,
+commerce, sign-in and customer accounts, built on the Ominity TypeScript SDK as is.
 
-- server-first CMS rendering
-- locale-aware routing and metadata
-- SSG/ISR-ready catch-all routing
-- Tailwind CSS + shadcn-style UI foundation
-- optional Ominity forms module integration
-- full auth, customer-account, team, and commerce examples
-
-This starter is designed for long-term maintainability across multiple websites.
-
-## Highlights
-
-- **Reusable architecture** with clear boundaries (`lib/ominity`, `components/cms`, `app`)
-- **Configurable routing** (`none`, `language`, `country-language`)
-- **Canonical/alternate SEO support** via `@ominity/next`
-- **Mixed Server + Client CMS components** (interactive slider and form in otherwise server-rendered pages)
-- **Commerce route module** with localized route templates from locale dictionaries
-- **Separate route modules** for `cms`, `commerce`, and `auth`
-- **Commerce feature modules** for cart, wishlist, checkout, and payment
-- **Complete auth example** for login, registration, reset, MFA, social providers, sessions, and login activity
-- **Customer account portal** for switching, members, invitations, roles, permissions, addresses, orders, invoices, payments, subscriptions, and mandates
-- **Thin package route adapters** for commerce, auth, and customer accounts
-- **Mock mode** for local development without API credentials
+- **The SDK directly.** Server components call `ominity(locale)` and client components `useOminitySdk()`; both
+  are the plain `@ominity/api-typescript` client and use its types (`Product`, `Category`, `Cart`, `Order`, …).
+  Nothing is wrapped.
+- **One provider.** `src/components/providers.tsx` renders `OminityProvider`; components use the hooks from
+  `@ominity/next/react` (`useAuth`, `useUser`, `useCustomer`, `useCart`, `useCheckout`, `useOrders`, …).
+- **One route file for the API.** `src/app/api/[...ominity]/route.ts` serves everything the browser needs
+  (sign-in, cart and checkout, customer accounts, the SDK gateway, tracking, forms, draft mode, dev tool).
+- **One page file.** `src/app/[[...path]]/page.tsx` resolves every URL to a CMS page, product, category or one of
+  the starter's own pages, for every locale strategy, and renders it with that page's view from `src/app/[[...path]]/_views`
+  (`cms`, `commerce`, `auth`, `account`).
+- Tailwind CSS and shadcn-style UI components.
 
 ## Quick start
 
@@ -33,136 +23,86 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Set at least `OMINITY_API_URL` and `OMINITY_API_KEY`, plus `OMINITY_AUTH_CLIENT_ID`, `OMINITY_AUTH_CLIENT_SECRET` and
+`OMINITY_AUTH_SESSION_SECRET` for sign-in. Open [http://localhost:3000](http://localhost:3000).
 
-By default, `OMINITY_USE_MOCK_DATA=true`, so the app works out of the box.
+## Layout
 
-## Switch to live Ominity API
+```
+src/
+  app/
+    [[...path]]/page.tsx        every page: resolves the URL, renders its view
+    [[...path]]/_views/         what each kind of page renders, by domain: cms, commerce, auth, account
+    api/[...ominity]/route.ts   every API route, from @ominity/next/routes
+    layout.tsx, not-found.tsx, sitemap.ts
+  lib/
+    ominity/config.ts           environment
+    ominity/sdk.ts              ominity(locale): the server SDK (API key, server-only)
+    ominity/site.ts             channel, routing, link resolver
+    ominity/routes.ts           the starter's own pages and their localized paths
+    ominity/pages.ts            URL → page resolution
+    ominity/registry.tsx        CMS component registry
+  locales/routes/{lang}.json    localized paths: login (`auth/login`), cart, checkout, account, product (`p/{sku}-{slug}`), …
+  locales/ui/{lang}.json        UI copy
+  components/
+    providers.tsx               one OminityProvider for auth, accounts, cart, wishlist, tracking, dev tool
+    auth/, account/, commerce/  sign-in, account portal, cart → checkout → payment
+    cms/, site/, ui/            CMS blocks, header, shadcn-style UI
+```
 
-1. Set `OMINITY_USE_MOCK_DATA=false`
-2. Configure:
-   - `OMINITY_API_URL`
-   - `OMINITY_API_KEY`
-   - `OMINITY_AUTH_CLIENT_ID`, `OMINITY_AUTH_CLIENT_SECRET`, `OMINITY_AUTH_SESSION_SECRET` (for auth flows)
-3. Restart the dev server.
+## Using the SDK
 
-The API key identifies the current channel through `/channels/current`. Channel languages, countries, currencies, and defaults are used directly by routing and the Ominity Dev Tool.
+In a server component:
 
-## Scripts
+```tsx
+import { ominity } from "@/lib/ominity/sdk";
 
-- `npm run dev` – run local dev server
-- `npm run build` – production build
-- `npm run start` – run production server
-- `npm run lint` – lint code
-- `npm run typecheck` – run TypeScript checks
+const products = await ominity(locale).commerce.products.list({ include: "offers", limit: 24 });
+```
 
-## Architecture
+In a client component, through the gateway route with the signed-in user's session (no API key in the browser):
+
+```tsx
+import { useOrders, useOminityCustomerSdkPaginatedQuery } from "@ominity/next/react";
+
+const orders = useOrders({ pageSize: 10 });
+
+// Anything without a dedicated hook is the SDK itself:
+const payments = useOminityCustomerSdkPaginatedQuery(
+  (sdk, { customerId, page, limit, signal }) => sdk.commerce.customerPayments.list({ customerId, page, limit }, { signal }),
+);
+```
 
 See [`docs/architecture.md`](docs/architecture.md).
 
-Core flow:
+## Adding a page
 
-1. `app/(pages)/[...segment]/page.tsx` resolves route params
-2. `@ominity/next` routing resolves locale + canonical behavior
-3. CMS page is fetched from configured data source (`mock` or `live`)
-4. Generic renderer renders through project-owned registry
-5. Metadata and sitemap are generated from CMS data
+1. Add its path to `src/locales/routes/{lang}.json`, e.g. `"returns": "account/returns"`.
+2. Add its view to the domain file in `src/app/[[...path]]/_views` (`title`, optional `metadata`, `render`). The type check fails
+   until every route has a view.
 
-## Configuration
+Remove a feature by deleting its route entries, its views and its components.
 
-See [`docs/configuration.md`](docs/configuration.md) for all env vars and examples.
+## Documentation
 
-## Extending CMS components
+- [`docs/architecture.md`](docs/architecture.md)
+- [`docs/configuration.md`](docs/configuration.md)
+- [`docs/routing.md`](docs/routing.md)
+- [`docs/commerce.md`](docs/commerce.md)
+- [`docs/auth.md`](docs/auth.md)
+- [`docs/customer-accounts.md`](docs/customer-accounts.md)
+- [`docs/component-registry.md`](docs/component-registry.md)
+- [`docs/forms.md`](docs/forms.md)
 
-See [`docs/component-registry.md`](docs/component-registry.md).
+## Scripts
 
-## Auth
-
-See [`docs/auth.md`](docs/auth.md).
-
-## Customer accounts and teams
-
-See [`docs/customer-accounts.md`](docs/customer-accounts.md). The example account portal is deliberately comprehensive; each section under `src/components/account` can be removed independently when a project does not need it.
-
-## Commerce routes
-
-The starter includes separate route modules:
-
-- `src/app/page.tsx` for `/` root behavior (optional locale-aware redirect + CMS homepage fallback)
-- `src/app/(pages)/[...segment]` for CMS pages
-- `src/app/(commerce)` for commerce pages
-- `src/app/(auth)` for auth/account pages
-
-Commerce module routes:
-
-- product pages (template from `src/locales/routes/commerce/{lang}.json`, e.g. `product: "p/{sku}-{slug}"`)
-- category pages (template from `src/locales/routes/commerce/{lang}.json`, e.g. `category: "c/{slug}"`)
-- cart (from `src/locales/routes/commerce/{lang}.json`, key: `cart`)
-- wishlist (from `src/locales/routes/commerce/{lang}.json`, key: `wishlist`)
-- checkout (from `src/locales/routes/commerce/{lang}.json`, key: `checkout`)
-- payment (from `src/locales/routes/commerce/{lang}.json`, key: `payment`; can be nested like `checkout/payment`)
-- account links integrate with auth module when enabled
-
-Starter APIs:
-
-- `/api/auth/*` for login/register/session/refresh/MFA/password/social-provider/login-activity flows
-- `/api/customer-accounts/*` for switching, teams, permissions, invitations, and active-customer resources
-- `/api/commerce/*` for cart items, checkout, shipping/payment methods, orders, and payments
-
-### Local JSON translations
-
-- Local UI copy can be stored in JSON dictionaries under `src/locales/ui/*.json`.
-- The starter includes English and Dutch dictionaries and uses them in the site header.
-- The header locale switcher component (`src/components/site/locale-switcher.tsx`) is channel-aware and supports:
-  - language mode (`OMINITY_LOCALE_SEGMENT_STRATEGY=language`)
-  - country-language mode (`OMINITY_LOCALE_SEGMENT_STRATEGY=country-language`)
-- The switcher keeps a locale cookie (`ominity_locale`) to align API request language.
-- Server SDK calls now resolve language from request locale context (header/cookie/referrer path) and pass it as the SDK `language` option.
-- Optional home auto-redirect is available for `/`:
-  - `OMINITY_HOME_LOCALE_REDIRECT_MODE=off | accept-language | cookie-accept-language | geo-cookie-accept-language`
-  - `OMINITY_HOME_LOCALE_REDIRECT_SKIP_BOTS=true` (recommended for SEO-safe behavior)
-- Cart creation auto-resolves `country` from:
-  1. locale country segment (when using `country-language`)
-  2. request country detection headers / `Accept-Language`
-  3. channel default country fallback
-
-### Excluding modules per project
-
-You have three clean options:
-
-1. **Config-only**: toggle `OMINITY_FEATURE_*` flags (fastest).
-2. **Delete route folders**: remove `src/app/(commerce)` or `src/app/(auth)` for hard exclusion.
-3. **Delete feature code**: remove `src/components/commerce`, `src/components/auth`, or individual `src/components/account` sections after route removal.
-
-Recommended production approach: keep feature folders and control rollout with flags first.
-By default, all commerce modules are enabled in `.env.example`.
-
-## Forms integration
-
-See [`docs/forms.md`](docs/forms.md).
-
-The starter uses `@ominity/next/forms` for rendering/submission and
-`@ominity/api-module-forms` for optional server-side form validation.
-
-## Best-practice notes
-
-- Keep CMS blocks as **small focused components**
-- Keep route strategy/env config centralized in `src/lib/ominity/env.ts`
-- Prefer adding functionality via new blocks and registry entries over branching page logic
-- Keep `@ominity/next` internals untouched; extend via config and project components
-- Keep each module isolated by route folder + feature flag
+- `npm run dev` · `npm run build` · `npm run start` · `npm run lint` · `npm run typecheck`
 
 ## Production checklist
 
-- [ ] Set `OMINITY_USE_MOCK_DATA=false`
-- [ ] Set `OMINITY_API_URL` and `OMINITY_API_KEY`
-- [ ] Configure API env vars and locale strategy
-- [ ] Configure `OMINITY_AUTH_CLIENT_ID`, `OMINITY_AUTH_CLIENT_SECRET`, `OMINITY_AUTH_SESSION_SECRET` if auth flows are used
-- [ ] Decide whether `OMINITY_FEATURE_CUSTOMER_ACCOUNTS` and its invitation/team UI are needed
-- [ ] Decide `OMINITY_CHECKOUT_ALLOW_GUEST` policy
-- [ ] Enable `OMINITY_TRACKING_ENABLED` when visitor/event tracking should be sent to Ominity
-- [ ] Configure `NEXT_PUBLIC_SITE_URL`
-- [ ] Configure `OMINITY_DRAFT_TOKEN`
-- [ ] Configure reCAPTCHA keys (if forms use anti-bot)
-- [ ] Verify canonical redirects and translated slugs
-- [ ] Validate sitemap output at `/sitemap.xml`
+- [ ] `OMINITY_API_URL`, `OMINITY_API_KEY`, `NEXT_PUBLIC_SITE_URL`
+- [ ] `OMINITY_AUTH_CLIENT_ID`, `OMINITY_AUTH_CLIENT_SECRET` and a real `OMINITY_AUTH_SESSION_SECRET`
+- [ ] `OMINITY_LOCALE_SEGMENT_STRATEGY` and the paths in `src/locales/routes`
+- [ ] `OMINITY_CHECKOUT_ALLOW_GUEST`, `OMINITY_TRACKING_ENABLED`, `OMINITY_DRAFT_TOKEN`
+- [ ] `OMINITY_DEV_TOOL=false`
+- [ ] Check canonical redirects and `/sitemap.xml`

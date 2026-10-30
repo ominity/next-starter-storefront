@@ -1,17 +1,12 @@
+import { createOminityDevToolSnapshot, OminityDevTool } from "@ominity/next/dev-tool";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { OminityDevTool } from "@ominity/next/dev-tool";
 
 import { Providers } from "@/components/providers";
-import { SiteHeader } from "@/components/site/site-header";
-import { createStarterDevToolSnapshot } from "@/lib/ominity/dev-tool";
-import { getStarterOminityConfig } from "@/lib/ominity/env";
-import { getStarterDevToolChannelInfo } from "@/lib/ominity/site";
+import { config } from "@/lib/ominity/config";
+import { getDevToolChannelInfo } from "@/lib/ominity/site";
 
 import "./globals.css";
-
-const config = getStarterOminityConfig();
-const trackingEnabled = config.trackingEnabled && !config.useMockData && Boolean(config.apiUrl && config.apiKey);
 
 export const metadata: Metadata = {
   metadataBase: new URL(config.siteUrl),
@@ -20,32 +15,42 @@ export const metadata: Metadata = {
     default: "Ominity Next Starter",
     template: "%s | Ominity Next Starter",
   },
-  description:
-    "Production-ready Next.js starter with @ominity/next, Tailwind, shadcn, and App Router best practices.",
+  description: "Next.js starter for Ominity: CMS pages, commerce and customer accounts with @ominity/next.",
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const channel = await getStarterDevToolChannelInfo();
-  const devToolSnapshot = createStarterDevToolSnapshot(config, channel);
-  const trackingChannelId = typeof channel?.id === "string"
-    ? channel.id
-    : typeof channel?.id === "number"
-      ? String(channel.id)
-      : undefined;
+  const channel = await getDevToolChannelInfo();
+  const channelId = channel?.id === undefined ? undefined : String(channel.id);
+  const devToolSnapshot = createOminityDevToolSnapshot({
+    appName: "Ominity Next Starter",
+    environment: config.nodeEnv,
+    apiUrl: config.apiUrl,
+    debugLogs: config.debugLogs,
+    enabled: config.devTool,
+    localeSegmentStrategy: config.localeSegmentStrategy,
+    basePath: config.basePath || "/",
+    trailingSlash: config.trailingSlash,
+    canonicalRedirectPolicy: config.canonicalRedirectPolicy,
+    ...(channelId ? { channelId } : {}),
+    requiredEnvironment: [
+      { name: "OMINITY_API_KEY", value: config.apiKey, message: "Required for every Ominity request." },
+      { name: "OMINITY_AUTH_CLIENT_ID", value: config.authClientId, message: "Required for sign-in." },
+      { name: "OMINITY_AUTH_CLIENT_SECRET", value: config.authClientSecret, message: "Required for sign-in." },
+      { name: "OMINITY_AUTH_SESSION_SECRET", value: config.authSessionSecret, message: "Signs the session cookie." },
+    ],
+  });
 
   return (
     <html lang={channel?.defaultLocale ?? "en"} suppressHydrationWarning>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <Providers
           devToolEnabled={config.devTool}
-          devToolSnapshot={devToolSnapshot}
-          customerAccountsEnabled={config.enableCustomerAccounts}
-          trackingEnabled={trackingEnabled}
-          channelId={trackingChannelId}
+          devToolSnapshot={{ ...devToolSnapshot, ...(channel ? { channel } : {}) }}
+          trackingEnabled={config.trackingEnabled}
+          channelId={channelId}
         >
           <div className="relative flex min-h-screen flex-col">
-            <SiteHeader />
-            <main className="container flex-1 py-8 md:py-12">{children}</main>
+            {children}
             <footer className="border-t py-6 text-center text-xs text-muted-foreground">
               Ominity Next Starter · Built for reusable CMS-driven projects.
             </footer>

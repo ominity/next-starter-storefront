@@ -1,39 +1,35 @@
-# Routing Strategies
+# Routing
 
-The starter uses `createRoutingConfig` and `createCmsLinkResolver` from `@ominity/next`.
+One page file, `src/app/[[...path]]/page.tsx`, serves every URL. `resolvePage` in `src/lib/ominity/pages.ts` decides
+what it is, and the matching view in `src/app/[[...path]]/_views` renders it.
 
-## Supported URL shapes
+## Locale prefixes
 
-- `none` → `/contact`
-- `language` → `/nl/contacteer-ons`
-- `country-language` → `/be/nl/contacteer-ons`
+`OMINITY_LOCALE_SEGMENT_STRATEGY`:
 
-## Canonical redirects
+- `none` → `/cart`
+- `language` → `/nl/cart`
+- `country-language` → `/be/nl/cart`
 
-When `OMINITY_CANONICAL_REDIRECT_POLICY=if-not-canonical`, valid non-canonical URLs can redirect to canonical localized slug.
+## The starter's own pages
 
-## Route-object links
+`src/locales/routes/{lang}.json` holds the path of every page per language, for example `"cart": "winkelwagen"` or
+`"product": "product/{sku}-{slug}"`. A placeholder that is a whole last segment (the category `{slug}`) takes the
+remaining segments. Languages without a file fall back to the first one.
 
-`LocaleLink` + `createCmsLinkResolver` supports route objects:
+`routePaths(locale, routing)` gives all of them for a locale; pages and the header get them as `paths`.
 
-```ts
-{
-  resource: "route",
-  name: "page",
-  locale: "nl",
-  parameters: {
-    slug: "contacteer-ons"
-  }
-}
-```
+## Everything else
 
-Default route resolvers are included for `page`, `product`, `category`.
+Paths that match no entry are CMS pages, resolved with `fetchCmsPageForParams` from `@ominity/next/next`.
 
-## Utility routes
+## Canonical URLs
 
-Starter utility routes are localized with the same locale prefix strategy:
+With `OMINITY_CANONICAL_REDIRECT_POLICY=if-not-canonical`, a valid URL that isn't the canonical one (missing locale
+prefix, outdated product slug) redirects. Each page also knows its URL in every channel language, used for hreflang
+and the language switcher.
 
-- commerce: `/cart`, `/wishlist`, `/checkout`, `/payment`
-- auth: `/auth/*`, `/account`
+## Links to SDK models
 
-All are feature-gated by `OMINITY_FEATURE_*`.
+`linkTo(product, locale)` (`src/lib/ominity/site.ts`) builds the localized URL of anything with SDK `routes`, such as
+a `Product` or `Category`.

@@ -2,7 +2,7 @@
 
 ## Build fails with missing Ominity env vars
 
-Set `OMINITY_USE_MOCK_DATA=true` for local development without API credentials.
+Set `OMINITY_API_URL` and `OMINITY_API_KEY`; every page loads from the Ominity API.
 
 ## Login/register returns 401 or 500
 
@@ -14,14 +14,18 @@ Set `OMINITY_USE_MOCK_DATA=true` for local development without API credentials.
 
 - verify `OMINITY_LOCALE_SEGMENT_STRATEGY`
 - verify route slugs in CMS data for configured locales
-- test with mock mode to isolate API vs routing issues
+- check the paths in `src/locales/routes/*.json` for the starter's own pages
 
 ## Forms submit returns 500
 
-- in live mode, ensure `OMINITY_API_KEY` is set
+- ensure `OMINITY_API_KEY` is set
 - verify API base URL points to Ominity API
 - verify reCAPTCHA secret when enabled
 
 ## Draft mode endpoint returns 401
 
 Use `/api/draft?secret=<OMINITY_DRAFT_TOKEN>&slug=/some-path`.
+
+## Cart, checkout or account requests return 403 `INVALID_ORIGIN`
+
+`NEXT_PUBLIC_SITE_URL` must match the origin the site is opened on (including the port in development).

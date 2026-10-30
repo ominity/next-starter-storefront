@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-import { useAuth } from "./auth-provider";
+import { useAuth } from "@ominity/next/react";
 import { resolvePasswordStrength } from "./password-strength";
 import { InputPassword } from "./input-password";
 import { PasswordStrengthBar } from "./password-strength-bar";
@@ -53,14 +53,14 @@ export function AuthRegisterPage(props: AuthRegisterPageProps) {
     setSubmitting(true);
     setMessage(null);
     try {
-      await auth.register({
+      const result = await auth.register({
         firstName: firstName.trim(),
         ...(lastName.trim().length > 0 ? { lastName: lastName.trim() } : {}),
         email: email.trim().toLowerCase(),
         password,
       });
 
-      router.replace(props.paths.account as Route);
+      router.replace((result.status === "authenticated" ? props.paths.account : props.paths.login) as Route);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not register.");
     } finally {
@@ -75,41 +75,43 @@ export function AuthRegisterPage(props: AuthRegisterPageProps) {
         <CardDescription>Create an account for faster checkout.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Input
-          value={firstName}
-          onChange={(event) => setFirstName(event.target.value)}
-          placeholder="First name"
-          autoComplete="given-name"
-          disabled={submitting}
-        />
-        <Input
-          value={lastName}
-          onChange={(event) => setLastName(event.target.value)}
-          placeholder="Last name (optional)"
-          autoComplete="family-name"
-          disabled={submitting}
-        />
-        <Input
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="Email"
-          type="email"
-          autoComplete="email"
-          disabled={submitting}
-        />
-        <div className="space-y-2">
-          <InputPassword
-            value={password}
-            onChange={setPassword}
-            placeholder="Password"
-            autoComplete="new-password"
+        <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+          <Input
+            value={firstName}
+            onChange={(event) => setFirstName(event.target.value)}
+            placeholder="First name"
+            autoComplete="given-name"
             disabled={submitting}
           />
-          <PasswordStrengthBar password={password} />
-        </div>
-        <Button disabled={submitting} onClick={() => { void submit(); }}>
-          {submitting ? "Creating account…" : "Create account"}
-        </Button>
+          <Input
+            value={lastName}
+            onChange={(event) => setLastName(event.target.value)}
+            placeholder="Last name (optional)"
+            autoComplete="family-name"
+            disabled={submitting}
+          />
+          <Input
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="Email"
+            type="email"
+            autoComplete="email"
+            disabled={submitting}
+          />
+          <div className="space-y-2">
+            <InputPassword
+              value={password}
+              onChange={setPassword}
+              placeholder="Password"
+              autoComplete="new-password"
+              disabled={submitting}
+            />
+            <PasswordStrengthBar password={password} />
+          </div>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? "Creating account…" : "Create account"}
+          </Button>
+        </form>
         {message && <p className="text-sm text-muted-foreground">{message}</p>}
         <p className="text-sm text-muted-foreground">
           Already have an account?{" "}

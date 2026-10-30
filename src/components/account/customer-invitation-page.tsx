@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useOminityCustomerAccounts } from "@ominity/next/customer-accounts/react";
 
-import { useAuth } from "@/components/auth";
+import { useAuth } from "@ominity/next/react";
 import { InputPassword } from "@/components/auth/input-password";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,7 +114,7 @@ export function CustomerInvitationPage({ token, paths }: CustomerInvitationPageP
     );
   }
 
-  const sessionEmail = auth.session?.email?.trim().toLowerCase();
+  const sessionEmail = auth.user?.email?.trim().toLowerCase();
   const invitationEmail = invitation.email.trim().toLowerCase();
   const emailMatches = sessionEmail === invitationEmail;
 
@@ -133,7 +133,7 @@ export function CustomerInvitationPage({ token, paths }: CustomerInvitationPageP
           {invitation.role?.description && <p className="mt-2 text-muted-foreground">{invitation.role.description}</p>}
         </div>
 
-        {auth.session ? (
+        {auth.user ? (
           emailMatches ? (
             <Button type="button" disabled={accounts.isMutationPending("accept-invitation")} onClick={() => { void accept(); }}>
               {accounts.isMutationPending("accept-invitation") ? "Accepting…" : "Accept invitation"}
@@ -141,7 +141,7 @@ export function CustomerInvitationPage({ token, paths }: CustomerInvitationPageP
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-destructive">
-                You are signed in as {auth.session.email}. Sign in as {invitation.email} to accept this invitation.
+                You are signed in as {auth.user.email}. Sign in as {invitation.email} to accept this invitation.
               </p>
               <Button type="button" variant="outline" onClick={() => { void auth.signOut(); }}>Sign out</Button>
             </div>

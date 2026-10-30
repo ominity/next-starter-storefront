@@ -1,9 +1,0 @@
-{
-  "product": "p/{sku}-{slug}",
-  "category": "c/{slug}",
-  "products": "products",
-  "cart": "cart",
-  "wishlist": "wishlist",
-  "checkout": "checkout",
-  "payment": "payment"
-}

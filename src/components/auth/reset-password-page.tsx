@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@ominity/next/react";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -17,6 +18,7 @@ export interface AuthResetPasswordPageProps {
 }
 
 export function AuthResetPasswordPage(props: AuthResetPasswordPageProps) {
+  const auth = useAuth();
   const [email, setEmail] = useState(props.initialEmail ?? "");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -33,15 +35,9 @@ export function AuthResetPasswordPage(props: AuthResetPasswordPageProps) {
     setSubmitting(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/auth/password/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), token: props.token, password }),
-      });
-      const result = await response.json() as { readonly message?: string; readonly error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Could not reset the password.");
+      await auth.resetPassword({ email: email.trim().toLowerCase(), token: props.token, password });
       setCompleted(true);
-      setMessage(result.message ?? "Password updated. You can sign in now.");
+      setMessage("Password updated. You can sign in now.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not reset the password.");
     } finally {

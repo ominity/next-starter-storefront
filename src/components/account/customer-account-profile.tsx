@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { Address } from "@ominity/next/customer-accounts";
-import { CUSTOMER_PERMISSIONS } from "@ominity/next/customer-accounts";
+import type { Address } from "@ominity/api-typescript/models";
 import {
-  useOminityCustomerAccounts,
-  useOminityCustomerQuery,
-} from "@ominity/next/customer-accounts/react";
+  CUSTOMER_PERMISSIONS,
+  useAddresses,
+  useCustomer,
+  useOminityCustomerSdkQuery,
+  useOminitySdk,
+} from "@ominity/next/react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,18 +56,13 @@ function addressDraft(address: Address): AddressDraft {
 }
 
 export function CustomerAccountProfile() {
-  const accounts = useOminityCustomerAccounts();
-  const customer = useOminityCustomerQuery(
-    ({ client, signal }) => client.customer.get({}, { signal }),
+  const accounts = useCustomer();
+  const sdk = useOminitySdk();
+  const customer = useOminityCustomerSdkQuery(
+    (client, { customerId, signal }) => client.commerce.customers.get({ id: customerId }, { signal }),
     { permission: CUSTOMER_PERMISSIONS.customerView },
   );
-  const addresses = useOminityCustomerQuery(
-    ({ client, signal }) => client.addresses.list(
-      { page: 1, limit: 100, sort: "-createdAt" },
-      { signal },
-    ),
-    { permission: CUSTOMER_PERMISSIONS.addressesView },
-  );
+  const book = useAddresses();
   const [profileSaving, setProfileSaving] = useState(false);
   const [address, setAddress] = useState<AddressDraft>(EMPTY_ADDRESS);
   const [addressSaving, setAddressSaving] = useState(false);
@@ -78,11 +75,14 @@ export function CustomerAccountProfile() {
     setProfileSaving(true);
     setMessage(null);
     try {
-      await accounts.client.customer.update({
-        name: value("name") || null,
-        email: value("email").toLowerCase() || null,
-        phone: value("phone") || null,
-        companyVat: value("companyVat") || null,
+      await sdk.commerce.customers.update({
+        id: accounts.customerId as number,
+        data: {
+          name: value("name") || null,
+          email: value("email").toLowerCase() || null,
+          phone: value("phone") || null,
+          companyVat: value("companyVat") || null,
+        },
       });
       await customer.refresh();
       setMessage("Customer details saved.");
@@ -113,14 +113,7 @@ export function CustomerAccountProfile() {
       country: address.country.trim().toUpperCase(),
     };
     try {
-      if (typeof address.id === "number") {
-        await accounts.client.addresses.update(address.id, data);
-      } else {
-        await accounts.client.addresses.create(data, {
-          headers: { "Idempotency-Key": crypto.randomUUID() },
-        });
-      }
-      await addresses.refresh();
+      await (typeof address.id === "number" ? book.update(address.id, data) : book.create(data));
       setAddress(EMPTY_ADDRESS);
       setMessage("Address saved.");
     } catch (error) {
@@ -130,7 +123,7 @@ export function CustomerAccountProfile() {
     }
   };
 
-  if (!accounts.activeMembership) return null;
+  if (!accounts.membership) return null;
 
   return (
     <div className="grid gap-6 xl:grid-cols-2">
@@ -182,10 +175,10 @@ export function CustomerAccountProfile() {
             <CardDescription>Addresses shared by checkout and customer workflows.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {addresses.loading && <p className="text-sm text-muted-foreground">Loading addresses…</p>}
-            {addresses.error && <p className="text-sm text-destructive">{addresses.error.message}</p>}
+            {book.loading && <p className="text-sm text-muted-foreground">Loading addresses…</p>}
+            {book.error && <p className="text-sm text-destructive">{book.error.message}</p>}
             <div className="space-y-2">
-              {addresses.data?.items.map((item) => (
+              {book.addresses.map((item) => (
                 <div key={item.id ?? `${item.street}-${item.number}`} className="flex items-start gap-3 rounded-lg border p-3">
                   <div className="min-w-0 flex-1 text-sm">
                     <p className="font-medium">{[item.firstName, item.lastName].filter(Boolean).join(" ") || "Address"}</p>
@@ -202,8 +195,7 @@ export function CustomerAccountProfile() {
                         onClick={() => {
                           if (!window.confirm("Delete this address?")) return;
                           setMessage(null);
-                          void accounts.client.addresses.remove(item.id as number)
-                            .then(() => addresses.refresh())
+                          void book.remove(item.id as number)
                             .catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Could not delete the address."));
                         }}
                       >
@@ -213,7 +205,7 @@ export function CustomerAccountProfile() {
                   )}
                 </div>
               ))}
-              {addresses.data && addresses.data.items.length === 0 && (
+              {book.ready && book.addresses.length === 0 && (
                 <p className="text-sm text-muted-foreground">No addresses yet.</p>
               )}
             </div>

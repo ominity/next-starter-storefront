@@ -1,43 +1,90 @@
 # Customer accounts and teams
 
-The starter renders a complete example account portal while `@ominity/next/customer-accounts` owns state, permissions, request cancellation, active-account isolation, and API behavior.
+The account page (`account`) renders a complete example portal in `src/components/account`, while `@ominity/next`
+owns the state, permissions, active-account isolation and API behavior. Everything is shown as the SDK model
+(`CustomerUser`, `Customer`, `Address`, `Order`, `Invoice`, `Subscription`, `SubscriptionChange`, `Payment`,
+`Mandate`, …); the starter defines no customer, order or subscription types.
 
 ## Included examples
 
-- switching between every customer account the user can access
-- active customer details with permission-aware editing
-- customer address list, creation, editing, and deletion
-- team member list, role assignment, and removal
-- email invitations for existing and new users, plus revocation
-- normal login or registration followed by authenticated invitation acceptance
-- assignable channel roles and translated permission metadata
-- orders, invoices with PDF download, payments, subscriptions, mandates, and customer groups
-- subscription cancellation when the user has `commerce.subscriptions.manage`
+- switching between every customer account the user belongs to (`account-switcher.tsx`, also in the header)
+- active customer details with permission-aware editing, and the address book (`customer-account-profile.tsx`)
+- team members, role assignment and removal, email invitations and revocation (`customer-account-team.tsx`)
+- invitation acceptance after the normal login or registration (`customer-invitation-page.tsx`)
+- orders, invoices with PDF download, subscriptions with plan changes and cancellation, payments, mandates and
+  customer groups (`customer-account-resources.tsx`)
+- the user's profile, MFA, recovery codes and sign-in history (`account-security.tsx`, see [`auth.md`](auth.md))
 
-The account page imports the SDK model names exposed by the package. It does not define alternate customer, order, payment, or subscription wire types.
+## Provider and routes
 
-## Shared provider
+`OminityProvider` in `src/components/providers.tsx` loads the memberships after sign-in and keeps the active one;
+the starter passes `customerAccounts={{ teamPageSize: 100 }}`. `/api/customer-accounts/*` (context, switching,
+team, invitations) and the SDK gateway `/api/ominity/*` are served by `src/app/api/[...ominity]/route.ts`, which also
+builds the localized invitation link with `resolveInvitationAcceptUrl`.
 
-`src/components/providers.tsx` places `OminityCustomerAccountsProvider` inside `OminityAuthProvider`. The provider loads memberships after auth becomes ready, validates the selected account on the server, and reloads account-bound data after a switch. It also loads team resources only when the active membership has `commerce.users.view`.
+The active customer is stored in an HttpOnly cookie and validated on the server. Switching reloads every
+account-bound hook without showing the previous account's data, and Ominity authorizes every request again with the
+user's access token.
 
-## One server route
+## The account dashboard
 
-`src/app/api/customer-accounts/[[...path]]/route.ts` exports the package catch-all factory. It covers account context and switching, team members, invitations, roles, permission metadata, customer details, addresses, groups, mandates, payments, orders, invoices, and subscriptions.
+`CustomerAccountDashboard` reads the active account with `useCustomer()` (`membership`, `customer`, `customerId`,
+`memberships`, `switchTo`, `can`) and renders the profile, team and resource sections.
 
-The active customer is stored in an HttpOnly cookie. The browser never sends a customer ID for resource operations, so switching cannot leak data returned for a previously active account. The backend authorizes every operation again with the authenticated user's access token.
+`CustomerAccountResources` uses the dedicated hooks where there are any and the SDK for the rest:
+
+```tsx
+const orders = useOrders({ pageSize: 10, mode: "append" });
+const invoices = useInvoices({ pageSize: 10, mode: "append" });
+const subscriptions = useSubscriptions({ pageSize: 10, mode: "append" });
+
+// Everything without a dedicated hook is the SDK itself.
+const payments = useOminityCustomerSdkQuery(
+  (sdk, { customerId, signal }) => sdk.commerce.customerPayments.list({ customerId, page: 1, limit: 10, sort: "-createdAt" }, { signal }),
+  { permission: CUSTOMER_PERMISSIONS.paymentsView },
+);
+```
+
+Invoices download with `invoices.download(invoice)`. Each list has "Show more" (`loadMore`) while `hasNext`.
+
+### Subscriptions
+
+Each subscription row follows the API's quote-then-confirm flow, when the member has
+`commerce.subscriptions.manage`:
+
+- **Change plan**: `subscriptions.transitions(id)` lists the plans with their charge; picking one calls
+  `quoteChange(id, offerId)`, and "Confirm" calls `confirmChange(id, quote.id)`.
+- **Cancel**: `quoteCancellation(id)` shows the end date and any warnings (notice period, minimum term); "Confirm"
+  calls `confirmCancellation(id, quote.id)`.
+- A scheduled cancellation can be undone with `revokeCancellation(id)`. An immediate upgrade that still needs payment
+  shows as `awaiting_payment`.
+
+### Profile and addresses
+
+`CustomerAccountProfile` loads the customer with `useOminityCustomerSdkQuery` and saves it with
+`useOminitySdk().commerce.customers.update(...)`; the address book uses `useAddresses()` (`create`, `update`,
+`remove`). The checkout offers the same addresses.
 
 ## Permissions
 
-The UI uses `CUSTOMER_PERMISSIONS`, `accounts.can(...)`, and `useOminityCustomerQuery({ permission })` to hide or disable unavailable actions. These checks improve the interface; Ominity remains the authorization boundary. Owners inherit all customer permissions. Roles are the source of truth for other members.
+The UI uses `CUSTOMER_PERMISSIONS` with `useCustomer().can(...)`, the `permission` option of the SDK hooks, and
+`CustomerPermissionBoundary` in the team section to hide or disable actions. These checks improve the interface;
+Ominity remains the authorization boundary. Owners have every permission; roles decide for other members.
 
-The channel controls which roles are assignable. An empty channel role selection means every assignable role. There is no channel list of enabled permission keys, and customer permission registration remains separate from admin permissions.
+The channel controls which roles are assignable. An empty channel role selection means every assignable role.
 
 ## Invitations
 
-Creating a customer user always creates an invitation using an email address. Ominity chooses the existing-user or new-account email template. The localized accept URL opens `account/invitations/{token}`.
+Inviting a team member always creates an email invitation; Ominity chooses the existing-user or new-account email.
+The link opens the localized `invitation` page (`account/invitations/{token}`).
 
-The public inspection operation shows the account, role, expiry, and whether registration is required. Acceptance always needs a valid user session whose email matches the invitation. The starter uses the normal `/api/auth/login` or `/api/auth/register` endpoint first; it has no invitation-specific signup endpoint.
+`CustomerInvitationPage` inspects the token publicly (customer, role, expiry, whether registration is needed), then
+uses `signInAndAcceptInvitation` or `registerAndAcceptInvitation` from `useOminityCustomerAccounts()`. These go
+through the normal `/api/auth/login` and `/api/auth/register` routes; when the user has MFA, the page sends them to
+the MFA step, which returns to the invitation page to accept. Acceptance needs a session whose email matches the invitation.
 
 ## Removing parts
 
-Each branded section lives in a separate file under `src/components/account`. A project can remove resource cards, address management, team management, security activity, or the header switcher without replacing package behavior. To remove the entire capability, set `OMINITY_FEATURE_CUSTOMER_ACCOUNTS=false` and delete the customer account route, provider wrapper, invitation pages, and account components.
+Each section lives in its own file under `src/components/account`; delete the file and its use in
+`customer-account-dashboard.tsx`. To remove customer accounts entirely, pass `customerAccounts: false` to
+`createOminityRouteHandlers`, remove the account switcher from the header, and delete the `invitation` route entry and its view in `_views/account.tsx`.

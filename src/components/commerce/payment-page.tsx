@@ -1,201 +1,135 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import type { Order, Payment } from "@ominity/api-typescript/models";
+import type { PaymentMethodIssuer } from "@ominity/api-typescript/models/settings/payment-method-issuer";
+import { useCheckout } from "@ominity/next/react";
 import type { Route } from "next";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
-import { useCommerce, type Order, type Payment } from "@/components/commerce/commerce-provider";
-import {
-  commerceOrderCurrency,
-  commerceOrderId,
-  commerceOrderTotal,
-  commercePaymentAmount,
-  commercePaymentCurrency,
-  commercePaymentId,
-} from "@ominity/next/commerce";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMoney } from "@/lib/ominity/commerce";
+import { formatAmount } from "@/lib/format";
 
 export interface CommercePaymentPageProps {
-  readonly paths: {
-    readonly cart: string;
-    readonly account: string;
-    readonly checkout: string;
-  };
+  readonly paths: { readonly cart: string; readonly account: string; readonly checkout: string; readonly payment: string };
   readonly orderId?: string;
 }
 
-export function CommercePaymentPage(props: CommercePaymentPageProps) {
-  const commerce = useCommerce();
+/** Pays an order placed in this browser (or by the signed-in customer) and shows its payments. */
+export function CommercePaymentPage({ paths, orderId }: CommercePaymentPageProps) {
+  const checkout = useCheckout();
   const [order, setOrder] = useState<Order | null>(null);
   const [payments, setPayments] = useState<ReadonlyArray<Payment>>([]);
-  const [loading, setLoading] = useState(false);
+  const [methodId, setMethodId] = useState<number | null>(null);
+  const [issuers, setIssuers] = useState<ReadonlyArray<PaymentMethodIssuer>>([]);
+  const [issuerId, setIssuerId] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const { getOrder, listPayments } = checkout;
 
   useEffect(() => {
-    const orderId = props.orderId;
-    if (!orderId || orderId.length === 0 || !commerce.ready) {
-      return;
-    }
+    if (!orderId) return;
+    void Promise.all([getOrder(orderId), listPayments(orderId)])
+      .then(([loaded, list]) => {
+        setOrder(loaded);
+        setPayments(list);
+      })
+      .catch(() => setMessage("This order could not be found."));
+    // Load once per order.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
 
-    let active = true;
-    const load = async () => {
-      setLoading(true);
-      setMessage(null);
-
-      try {
-        const [resolvedOrder, resolvedPayments] = await Promise.all([
-          commerce.getOrderById(orderId),
-          commerce.listOrderPayments(orderId),
-        ]);
-
-        if (!active) {
-          return;
-        }
-
-        setOrder(resolvedOrder);
-        setPayments(resolvedPayments);
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-
-        setMessage(error instanceof Error ? error.message : "Failed to load payment state.");
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [commerce, props.orderId]);
-
-  if (!commerce.ready || loading) {
+  if (!orderId || message === "This order could not be found.") {
     return (
       <Card>
-        <CardContent className="pt-6 text-sm text-muted-foreground">Loading payment…</CardContent>
-      </Card>
-    );
-  }
-
-  const orderId = props.orderId;
-  if (!orderId) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Payment</CardTitle>
-          <CardDescription>No order selected.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Link href={props.paths.checkout as Route} className="text-sm font-medium text-primary hover:underline">
-            Back to checkout
-          </Link>
-        </CardContent>
+        <CardHeader><CardTitle className="text-2xl">Payment</CardTitle><CardDescription>No order to pay.</CardDescription></CardHeader>
+        <CardContent><Link href={paths.cart as Route} className="text-sm font-medium text-primary hover:underline">Back to cart</Link></CardContent>
       </Card>
     );
   }
 
   if (!order) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Payment</CardTitle>
-          <CardDescription>Order was not found.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {message && <p className="text-sm text-muted-foreground">{message}</p>}
-          <Link href={props.paths.checkout as Route} className="text-sm font-medium text-primary hover:underline">
-            Restart checkout
-          </Link>
-        </CardContent>
-      </Card>
-    );
+    return <Card><CardContent className="pt-6 text-sm text-muted-foreground">Loading order…</CardContent></Card>;
   }
+
+  const paid = payments.some((payment) => payment.status === "paid");
+
+  const chooseMethod = async (id: number) => {
+    setMethodId(id);
+    setIssuerId(null);
+    setIssuers(await checkout.issuers(id).catch(() => []));
+  };
+
+  const pay = async () => {
+    if (methodId === null) return;
+    setMessage(null);
+    try {
+      const payment = await checkout.pay(order.id, {
+        paymentmethodId: methodId,
+        ...(issuerId !== null ? { issuerId } : {}),
+        redirectUrl: new URL(`${paths.payment}?order=${order.id}`, window.location.origin).toString(),
+      });
+      const checkoutUrl = payment.links?.checkout?.href;
+      if (checkoutUrl) {
+        window.location.assign(checkoutUrl);
+        return;
+      }
+      setPayments(await checkout.listPayments(order.id));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The payment could not be started.");
+    }
+  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Payment</CardTitle>
-          <CardDescription>Order {order.number ?? commerceOrderId(order)}</CardDescription>
+          <CardTitle className="text-2xl">{paid ? "Thank you" : "Payment"}</CardTitle>
+          <CardDescription>Order {order.number} · {order.status}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <p className="text-muted-foreground">
-            This starter surfaces order + payment state from Ominity. Payment authorization flows
-            are project-specific and should be integrated per payment gateway.
-          </p>
-
-          {message && <p className="text-muted-foreground">{message}</p>}
-
-          <div className="space-y-2 rounded-md border p-3">
-            <div className="flex items-center justify-between">
-              <span>Order status</span>
-              <span className="font-medium">{order.status}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Total</span>
-              <span className="font-semibold">{formatMoney(commerceOrderTotal(order), commerceOrderCurrency(order))}</span>
-            </div>
-            {order.createdAt && (
-              <div className="flex items-center justify-between">
-                <span>Created</span>
-                <span>{new Date(order.createdAt).toLocaleString()}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="font-medium">Payments</h3>
-            {payments.length === 0 ? (
-              <p className="text-muted-foreground">No payment transactions found for this order yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {payments.map((payment) => (
-                  <div key={commercePaymentId(payment)} className="rounded-md border p-3">
-                    <div className="flex items-center justify-between">
-                      <span>{commercePaymentId(payment)}</span>
-                      <span className="font-medium">{payment.status}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Amount</span>
-                      <span>{formatMoney(commercePaymentAmount(payment), commercePaymentCurrency(payment))}</span>
-                    </div>
-                    {payment.createdAt && (
-                      <div className="flex items-center justify-between">
-                        <span>Created</span>
-                        <span>{new Date(payment.createdAt).toLocaleString()}</span>
-                      </div>
-                    )}
-                  </div>
+        <CardContent className="space-y-4">
+          {!paid && (
+            <>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {checkout.paymentMethods.filter((method) => method.isEnabled).map((method) => (
+                  <Button key={method.id} variant={method.id === methodId ? "default" : "outline"} onClick={() => { void chooseMethod(method.id); }}>
+                    {method.label}
+                  </Button>
                 ))}
               </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Link href={props.paths.checkout as Route} className="font-medium text-primary hover:underline">
-              Checkout
-            </Link>
-            <Link href={props.paths.cart as Route} className="font-medium text-primary hover:underline">
-              Cart
-            </Link>
-            <Link href={props.paths.account as Route} className="font-medium text-primary hover:underline">
-              Account
-            </Link>
-          </div>
+              {issuers.length > 0 && (
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  value={issuerId ?? ""}
+                  onChange={(event) => setIssuerId(event.target.value ? Number(event.target.value) : null)}
+                  aria-label="Bank"
+                >
+                  <option value="">Choose your bank</option>
+                  {issuers.map((issuer) => <option key={issuer.id} value={issuer.id}>{issuer.name}</option>)}
+                </select>
+              )}
+              <Button disabled={methodId === null || checkout.checkoutPending} onClick={() => { void pay(); }}>
+                {checkout.checkoutPending ? "Starting payment…" : `Pay ${formatAmount(order.totalAmount)}`}
+              </Button>
+            </>
+          )}
+          {payments.map((payment) => (
+            <div key={payment.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
+              <span>Payment #{payment.id}</span>
+              <span className="font-medium">{payment.status}</span>
+            </div>
+          ))}
+          {message && <p className="text-sm text-destructive">{message}</p>}
+          <Link href={paths.account as Route} className="text-sm font-medium text-primary hover:underline">Go to account</Link>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Next step</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Connect a payment intent/create-payment endpoint from your gateway integration.
+        <CardHeader><CardTitle>Total</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div className="flex justify-between"><span>Subtotal</span><span>{formatAmount(order.subtotalAmount)}</span></div>
+          <div className="flex justify-between"><span>VAT</span><span>{formatAmount(order.vatAmount)}</span></div>
+          <div className="flex justify-between border-t pt-2 font-semibold"><span>Total</span><span>{formatAmount(order.totalAmount)}</span></div>
         </CardContent>
       </Card>
     </div>

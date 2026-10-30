@@ -8,10 +8,8 @@ import { ImageBlock } from "@/components/cms/image-block";
 import { TextBlock } from "@/components/cms/text-block";
 import { UnknownBlock } from "@/components/cms/unknown-block";
 
-import { getStarterOminityConfig } from "./env";
+import { config } from "./config";
 import type { CmsRenderContext as StarterRenderContext } from "@ominity/next/cms";
-
-const config = getStarterOminityConfig();
 
 export const cmsRegistry = createCmsRegistry<StarterRenderContext>([
   defineCmsComponent("text-block", TextBlock),

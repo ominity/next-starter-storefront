@@ -1,28 +1,17 @@
 "use client";
 
+import { useAuth, type OminitySocialProvider } from "@ominity/next/react";
 import { useEffect, useState } from "react";
-import type { OminityAuthPublicSocialProvider } from "@ominity/next/auth/server";
-
-interface SocialProviderResponse {
-  readonly items?: ReadonlyArray<OminityAuthPublicSocialProvider>;
-}
 
 export function SocialLoginOptions() {
-  const [providers, setProviders] = useState<ReadonlyArray<OminityAuthPublicSocialProvider>>([]);
+  const auth = useAuth();
+  const [providers, setProviders] = useState<ReadonlyArray<OminitySocialProvider>>([]);
+  const { listSocialProviders } = auth;
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/auth/social", {
-      signal: controller.signal,
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    })
-      .then(async (response) => response.ok ? response.json() as Promise<SocialProviderResponse> : { items: [] })
-      .then((response) => setProviders(Array.isArray(response.items) ? response.items : []))
-      .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === "AbortError")) setProviders([]);
-      });
-    return () => controller.abort();
+    void listSocialProviders().then(setProviders, () => setProviders([]));
+    // Load once; the provider list does not change while the page is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (providers.length === 0) return null;
@@ -38,7 +27,7 @@ export function SocialLoginOptions() {
         {providers.map((provider) => (
           <a
             key={provider.id}
-            href={`/api/auth/social/${provider.id}/start`}
+            href={auth.socialSignInUrl(provider.id)}
             className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-4 text-sm font-medium transition hover:bg-accent"
           >
             {provider.name || provider.provider}

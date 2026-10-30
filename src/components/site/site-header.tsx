@@ -1,44 +1,35 @@
-import { getStarterChannelContext } from "@/lib/ominity/site";
-import { listCommerceCategories } from "@/lib/ominity/commerce/server";
-import { getStarterOminityConfig } from "@/lib/ominity/env";
 import { SiteHeaderClient } from "@/components/site/site-header-client";
+import type { RoutePaths } from "@/lib/ominity/routes";
+import { ominity } from "@/lib/ominity/sdk";
+import { cmsLinkResolver, getChannel, linkTo } from "@/lib/ominity/site";
 
-export async function SiteHeader() {
-  const config = getStarterOminityConfig();
-  const channelContext = await getStarterChannelContext();
-  const categories = config.enableCommerceCategories
-    ? await listCommerceCategories(channelContext.defaultLocale)
-    : [];
-  const headerCategories = categories
-    .filter((entry) => Object.values(entry.routes).some((route) => route.name === "category"))
-    .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }))
-    .slice(0, 5)
-    .map((entry) => ({
-      id: String(entry.id),
-      name: entry.name,
-      routes: entry.routes as unknown as Parameters<typeof SiteHeaderClient>[0]["categories"][number]["routes"],
-    }));
+export interface SiteHeaderProps {
+  readonly locale: string;
+  readonly paths: RoutePaths;
+  /** The current page in other languages, by locale code; languages without it link to their home page. */
+  readonly alternates?: Readonly<Record<string, string>> | undefined;
+}
+
+export async function SiteHeader({ locale, paths, alternates = {} }: SiteHeaderProps) {
+  const [channel, categories] = await Promise.all([
+    getChannel(),
+    ominity(locale).commerce.categories.list({ limit: 5 }).catch(() => null),
+  ]);
 
   return (
     <SiteHeaderClient
-      defaultLocale={channelContext.defaultLocale}
-      {...(typeof channelContext.defaultCountry === "string" ? { defaultCountry: channelContext.defaultCountry } : {})}
-      {...(typeof channelContext.defaultCurrency === "string" ? { defaultCurrency: channelContext.defaultCurrency } : {})}
-      locales={channelContext.locales}
-      countries={channelContext.countries}
-      countryCurrencyMap={channelContext.countryCurrencyMap}
-      currencies={channelContext.currencies}
-      categories={headerCategories}
-      localeSegmentStrategy={config.localeSegmentStrategy}
-      trailingSlash={config.trailingSlash}
-      basePath={config.basePath}
-      enableCommerceProducts={config.enableCommerceProducts}
-      enableCommerceCategories={config.enableCommerceCategories}
-      enableCommerceCart={config.enableCommerceCart}
-      enableCommerceWishlist={config.enableCommerceWishlist}
-      enableCommerceCheckout={config.enableCommerceCheckout}
-      enableAuth={config.enableAuth}
-      enableCustomerAccounts={config.enableCustomerAccounts}
+      locale={locale}
+      paths={paths}
+      contactPath={cmsLinkResolver.resolve("/contact", { locale }).href}
+      categories={(categories?.items ?? []).flatMap((category) => {
+        const path = linkTo(category, locale);
+        return path ? [{ id: category.id, label: category.name, path }] : [];
+      })}
+      locales={channel.locales.map((entry) => ({
+        code: entry.code,
+        label: entry.label ?? entry.code,
+        path: alternates[entry.code] ?? cmsLinkResolver.resolve("/", { locale: entry.code }).href,
+      }))}
     />
   );
 }

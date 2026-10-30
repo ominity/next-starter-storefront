@@ -1,69 +1,43 @@
 # Architecture
 
-## Goals
+The starter keeps as little of its own code as possible: the Ominity TypeScript SDK is the data layer and
+`@ominity/next` provides routing, auth, cart, accounts and rendering. Projects change components, not plumbing.
 
-- keep the integration reusable across projects
-- keep framework concerns separated from CMS concerns
-- avoid project-specific assumptions inside shared integration code
+## Data: the SDK as is
 
-## Folders
+- **Server components** call `ominity(locale)` from `src/lib/ominity/sdk.ts`, a cached `Ominity` client with the API
+  key and the page's language. It is `server-only`.
+- **Client components** use the hooks from `@ominity/next/react`: `useAuth`, `useUser`, `useCustomer`, `useCart`,
+  `useCheckout`, `useWishlist`, `useOrders`, `useInvoices`, `useSubscriptions`, `useAddresses`, and the SDK itself
+  through `useOminitySdk`, `useOminitySdkQuery`, `useOminityCustomerSdkQuery`, …. The account hooks and the SDK talk
+  to `/api/ominity`, which adds the signed-in user's access token server-side and only allows the user's own account
+  and customers; cart and checkout go through `/api/commerce`. The API key never reaches the browser.
+- Components take and render SDK models (`Product`, `Category`, `Cart`, `Order`, `Paginated<Product>`) as they are.
 
-- `src/app`
-  - App Router routes and route handlers
-  - root page entry (`/page.tsx`) for `/` redirect/fallback
-  - catch-all CMS page entry (`(pages)/[...segment]`)
-  - modular commerce routes (localized templates from `src/locales/routes/commerce/*.json` for product/category and utility pages)
-  - separate auth routes (`/auth/*`, `/account`)
-  - thin auth, customer-account, and commerce route factories (`/api/auth/*`, `/api/customer-accounts/*`, `/api/commerce/*`)
-  - metadata/sitemap/draft endpoints
+## Routes
 
-- `src/lib/ominity`
-  - Ominity runtime configuration and environment parsing
-  - routing and link resolver setup
-  - CMS client selection (`mock` or `live`)
-  - commerce data-source + route resolution module
-  - commerce feature helpers (locale variants, metadata, feature flags, utility paths)
-  - component registry and renderer options
+- `src/app/api/[...ominity]/route.ts` exports `createOminityRouteHandlers(config)` from `@ominity/next/routes`. It
+  serves `/api/auth/*`, `/api/commerce/*`, `/api/customer-accounts/*`, `/api/ominity/*`, `/api/events`,
+  `/api/forms/submit`, `/api/draft` and `/api/dev-tool/requests`.
+- `src/app/[[...path]]/page.tsx` renders every page. `resolvePage` (`src/lib/ominity/pages.ts`):
+  1. reads the locale prefix of the configured strategy;
+  2. matches the rest against `src/locales/routes/{lang}.json`: fixed pages (cart, login, …), `product` and
+     `category`;
+  3. loads a product (by SKU) or category through the SDK, or otherwise the CMS page;
+  4. returns the canonical path and the page in every channel language (hreflang and the language switcher);
+     a non-canonical URL redirects.
+- The page then renders the view for that kind of page from `src/app/[[...path]]/_views` (`cms.tsx`, `commerce.tsx`, `auth.tsx`,
+  `account.tsx`). A view has a `title` (or its own `metadata`) and a `render({ page, paths, param, … })`; the page adds
+  the canonical and language alternates, the header and the layout. Pages without their own metadata are `noindex`
+  unless the view sets `indexed`.
 
-- `src/components/cms`
-  - project-owned CMS block implementations
-  - server blocks and client blocks coexist
+CMS pages are generated at build time (`generateStaticParams`); other pages render on first request and revalidate
+every 5 minutes.
 
-- `src/components/commerce`
-  - starter product/category/cart/wishlist/checkout/payment presentation
-  - client provider consuming starter API routes for cart/checkout
-  - wishlist kept local until wishlist API support is available
+## Rendering
 
-- `src/components/auth`
-  - branded login/register/password/account/MFA pages consuming package state
-  - password input + strength + MFA code UI primitives
-
-- `src/components/account`
-  - branded customer switcher, profile, addresses, team, invitation, commerce-resource, and login-activity examples
-  - permission-aware rendering over `@ominity/next/customer-accounts/react`
-
-- `src/lib/ominity/server`
-  - environment-to-package route configuration only
-  - localized invitation acceptance URL configuration
-
-- `src/components/ui`
-  - shadcn-style primitives for design consistency
-
-## Rendering model
-
-1. Next.js route receives params in `app/(pages)/[...segment]/page.tsx`
-2. `fetchCmsPageForParams` resolves path + locale + canonical behavior
-3. renderer maps CMS component keys to local React components via registry
-4. nested components and child trees render recursively
-5. client blocks (e.g. slider/form) hydrate inside a server-rendered page shell
-
-## Data-source strategy
-
-`src/lib/ominity/data-source.ts` is the single source of truth for where content comes from:
-
-- mock mode (`OMINITY_USE_MOCK_DATA=true`) → local fixtures
-- live mode (`false`) → `createCmsClient` backed by Ominity API
-
-This keeps route and rendering code unchanged across environments.
-
-For commerce/auth, mock mode routes still use the same `/api/*` contract so client components do not branch by environment. Customer team and account-resource examples require a live Ominity user/customer relationship.
+- `src/lib/ominity/registry.tsx` maps CMS component keys to `src/components/cms`.
+- `SiteHeader` is rendered by the page, so it knows the locale, the localized paths and the page's alternates.
+- `src/components/providers.tsx` renders one `OminityProvider` from `@ominity/next/react`: the browser SDK, auth,
+  customer accounts, cart, wishlist, tracking (`OMINITY_TRACKING_ENABLED`) and the dev tool provider
+  (`OMINITY_DEV_TOOL`). `src/app/layout.tsx` renders it and the `OminityDevTool` bar.
