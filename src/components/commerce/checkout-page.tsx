@@ -244,7 +244,10 @@ function CheckoutSteps({ countries, defaultCountry, paths, cart }: CommerceCheck
                     type="radio"
                     name="shipping-method"
                     checked={checkout.cart?.shippingMethodId === String(method.id)}
-                    onChange={() => { void checkout.selectShippingMethod(String(method.id)); }}
+                    onChange={() => {
+                      void checkout.selectShippingMethod(String(method.id))
+                        .catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Could not select this shipping method."));
+                    }}
                   />
                   <span>
                     <span className="font-medium">{method.name}</span>

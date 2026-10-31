@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { formatPrice } from "@/lib/format";
 import { productPath } from "@/lib/ominity/routes";
 
+import { CartError } from "./cart-error";
+
 export interface CommerceWishlistPageProps {
   readonly paths: { readonly home: string; readonly cart: string };
   readonly locale: string;
@@ -28,6 +30,8 @@ export function CommerceWishlistPage({ paths, locale, routing }: CommerceWishlis
           <CardDescription>{wishlist.items.length} saved item(s)</CardDescription>
         </CardHeader>
       </Card>
+
+      <CartError />
 
       {wishlist.items.length === 0 ? (
         <Card>
@@ -49,7 +53,7 @@ export function CommerceWishlistPage({ paths, locale, routing }: CommerceWishlis
                 <CardContent className="space-y-2">
                   <p className="text-sm font-medium">{formatPrice(product.offers)}</p>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" disabled={cart.pending} onClick={() => { void cart.add(product); }}>Add to cart</Button>
+                    <Button size="sm" disabled={cart.pending} onClick={() => { void cart.add(product).catch(() => undefined); }}>Add to cart</Button>
                     <Button size="sm" variant="outline" onClick={() => wishlist.remove(product.id)}>Remove</Button>
                     {path && <Link href={path as Route} className="text-sm font-medium text-primary hover:underline">View product</Link>}
                   </div>

@@ -42,6 +42,8 @@ from `src/lib/format.ts`, never recalculated.
   `product_viewed` event.
 - **Cart page** (`cart-page.tsx`): quantities with `cart.setQuantity(item.id, quantity)`, `cart.remove(item.id)` and
   `cart.clear()`; the header's cart drawer (`src/components/site/cart-drawer.tsx`) shows the same items.
+  Cart actions reject when a change fails and keep the error in `cart.error`, and the cart reloads so it shows what
+  Ominity really holds. The buttons catch the rejection and `CartError` (`cart-error.tsx`) shows the message.
 - **Wishlist page** (`wishlist-page.tsx`): `useWishlist()` items, kept in this browser's storage, with "Add to cart".
 - **Cart summary** (`cart-summary.tsx`): subtotal, discount, shipping, tax and total from `cart.cart`, and promotion
   codes. `cart.applyPromotionCode(code)` rejects with `PROMOTION_CODE_NOT_APPLIED` when Ominity does not keep the

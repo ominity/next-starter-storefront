@@ -10,6 +10,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatAmount } from "@/lib/format";
 
+import { CartError } from "./cart-error";
 import { CartSummary } from "./cart-summary";
 
 export interface CommerceCartPageProps {
@@ -56,6 +57,7 @@ export function CommerceCartPage({ paths, guestCheckout }: CommerceCartPageProps
     <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">Cart · {cart.count} item(s)</h1>
+        <CartError />
         {cart.items.map((item) => (
           <Card key={item.id}>
             <CardHeader>
@@ -66,10 +68,10 @@ export function CommerceCartPage({ paths, guestCheckout }: CommerceCartPageProps
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="secondary" disabled={cart.pending} onClick={() => { void cart.setQuantity(item.id, item.quantity - 1); }}>−</Button>
+              <Button size="sm" variant="secondary" disabled={cart.pending} onClick={() => { void cart.setQuantity(item.id, item.quantity - 1).catch(() => undefined); }}>−</Button>
               <span className="text-sm">Qty {item.quantity}</span>
-              <Button size="sm" variant="secondary" disabled={cart.pending} onClick={() => { void cart.setQuantity(item.id, item.quantity + 1); }}>+</Button>
-              <Button size="sm" variant="outline" disabled={cart.pending} onClick={() => { void cart.remove(item.id); }}>Remove</Button>
+              <Button size="sm" variant="secondary" disabled={cart.pending} onClick={() => { void cart.setQuantity(item.id, item.quantity + 1).catch(() => undefined); }}>+</Button>
+              <Button size="sm" variant="outline" disabled={cart.pending} onClick={() => { void cart.remove(item.id).catch(() => undefined); }}>Remove</Button>
               <span className="ml-auto text-sm font-medium">{formatAmount(item.totalAmount)}</span>
             </CardContent>
           </Card>
@@ -84,7 +86,7 @@ export function CommerceCartPage({ paths, guestCheckout }: CommerceCartPageProps
             <Link href={checkoutPath as Route} className={buttonVariants()}>
               {loginFirst ? "Login to checkout" : "Proceed to checkout"}
             </Link>
-            <Button variant="outline" onClick={() => { void cart.clear(); }}>Clear cart</Button>
+            <Button variant="outline" onClick={() => { void cart.clear().catch(() => undefined); }}>Clear cart</Button>
           </div>
         </CardContent>
       </Card>

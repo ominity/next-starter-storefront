@@ -43,7 +43,7 @@ export function CartSummary({ promotions = true }: { readonly promotions?: boole
           {cart.promotionCodes.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {cart.promotionCodes.map((applied) => (
-                <Button key={applied} type="button" size="sm" variant="outline" onClick={() => { void cart.removePromotionCode(applied); }}>
+                <Button key={applied} type="button" size="sm" variant="outline" onClick={() => { void cart.removePromotionCode(applied).catch(() => undefined); }}>
                   {applied} ✕
                 </Button>
               ))}

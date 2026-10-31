@@ -6,6 +6,7 @@ import { ShoppingCart } from "lucide-react";
 import { useCart } from "@ominity/next/react";
 import { useState } from "react";
 
+import { CartError } from "@/components/commerce/cart-error";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Drawer,
@@ -58,6 +59,7 @@ export function CartDrawer(props: CartDrawerProps) {
         </DrawerHeader>
 
         <div className="max-h-[56vh] overflow-auto px-4">
+          <CartError />
           {cart.items.length === 0 ? (
             <p className="pb-4 text-sm text-muted-foreground">{props.emptyText}</p>
           ) : (
@@ -75,7 +77,7 @@ export function CartDrawer(props: CartDrawerProps) {
                       type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={() => { void cart.remove(item.id); }}
+                      onClick={() => { void cart.remove(item.id).catch(() => undefined); }}
                     >
                       Remove
                     </Button>

@@ -47,7 +47,7 @@ export function SiteHeaderClient({ locale, paths, contactPath, categories, local
     if (!target) return;
     rememberLocale(code);
     const country = parseLocaleCode(code).country;
-    if (country && cart.cart) void cart.setCountry(country);
+    if (country && cart.cart) void cart.setCountry(country).catch(() => undefined);
     router.push(target.path as Route);
   };
 

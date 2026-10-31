@@ -10,6 +10,8 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/format";
 
+import { CartError } from "./cart-error";
+
 export interface CommerceProductActionsProps {
   readonly product: Product;
   readonly canonicalPath: string;
@@ -43,11 +45,11 @@ export function CommerceProductActions({ product, canonicalPath, paths, guestChe
         <div className="text-2xl font-semibold">{formatPrice(product.offers)}</div>
       </div>
       <div className="grid gap-2">
-        <Button disabled={cart.pending} onClick={() => { void cart.add(product); }}>Add to cart</Button>
+        <Button disabled={cart.pending} onClick={() => { void cart.add(product).catch(() => undefined); }}>Add to cart</Button>
         <Button variant="secondary" onClick={() => wishlist.toggle(product)}>
           {wishlist.has(product.id) ? "Remove from wishlist" : "Add to wishlist"}
         </Button>
-        {cart.error && <p className="text-sm text-destructive">{cart.error.message}</p>}
+        <CartError />
         <Link className="text-sm font-medium text-primary hover:underline" href={paths.cart as Route}>View cart ({cart.count})</Link>
         <Link className="text-sm font-medium text-primary hover:underline" href={paths.wishlist as Route}>View wishlist ({wishlist.items.length})</Link>
         <Link className="text-sm font-medium text-primary hover:underline" href={checkoutPath as Route}>
