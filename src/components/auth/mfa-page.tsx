@@ -14,13 +14,13 @@ import { InputRecoveryCode } from "./input-recovery-code";
 
 const RECOVERY = "recovery";
 const LABELS: Readonly<Record<string, string>> = {
-  totp: "Authenticator app",
+  authenticator: "Authenticator app",
   email: "Email",
   sms: "SMS",
   [RECOVERY]: "Recovery code",
 };
 const HINTS: Readonly<Record<string, string>> = {
-  totp: "Enter the 6-digit code from your authenticator app.",
+  authenticator: "Enter the 6-digit code from your authenticator app.",
   email: "Send a code to your email address, then enter it here.",
   sms: "Send a code to your phone, then enter it here.",
   [RECOVERY]: "Use one of your single-use recovery codes.",

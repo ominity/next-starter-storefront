@@ -1,5 +1,7 @@
 "use client";
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 export interface LocaleSwitcherProps {
   readonly label: string;
   readonly value: string;
@@ -9,16 +11,16 @@ export interface LocaleSwitcherProps {
 
 export function LocaleSwitcher({ label, value, options, onChange }: LocaleSwitcherProps) {
   return (
-    <label className="ml-2 flex items-center gap-2 text-xs text-muted-foreground">
-      <span>{label}</span>
-      <select
-        className="h-8 rounded-md border bg-background px-2 text-xs text-foreground"
-        aria-label={label}
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value)}
-      >
-        {options.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
-      </select>
-    </label>
+    <div className="ml-2 flex items-center gap-2 text-xs text-muted-foreground">
+      <span aria-hidden>{label}</span>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger aria-label={label} className="h-8 w-auto gap-1.5 px-2 text-xs text-foreground md:text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => <SelectItem key={option.code} value={option.code}>{option.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

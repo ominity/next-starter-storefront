@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatAmount } from "@/lib/format";
 
 export interface CommercePaymentPageProps {
@@ -98,15 +99,12 @@ export function CommercePaymentPage({ paths, orderId }: CommercePaymentPageProps
                 ))}
               </div>
               {issuers.length > 0 && (
-                <select
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                  value={issuerId ?? ""}
-                  onChange={(event) => setIssuerId(event.target.value ? Number(event.target.value) : null)}
-                  aria-label="Bank"
-                >
-                  <option value="">Choose your bank</option>
-                  {issuers.map((issuer) => <option key={issuer.id} value={issuer.id}>{issuer.name}</option>)}
-                </select>
+                <Select value={issuerId === null ? "" : String(issuerId)} onValueChange={(next) => setIssuerId(Number(next))}>
+                  <SelectTrigger aria-label="Bank"><SelectValue placeholder="Choose your bank" /></SelectTrigger>
+                  <SelectContent>
+                    {issuers.map((issuer) => <SelectItem key={issuer.id} value={String(issuer.id)}>{issuer.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               )}
               <Button disabled={methodId === null || checkout.checkoutPending} onClick={() => { void pay(); }}>
                 {checkout.checkoutPending ? "Starting payment…" : `Pay ${formatAmount(order.totalAmount)}`}

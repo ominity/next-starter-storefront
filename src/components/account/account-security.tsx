@@ -1,18 +1,18 @@
 "use client";
 
-import type { UserMfaMethod } from "@ominity/api-typescript/models/identity/user-mfa-method";
 import type { UserRecoveryCode } from "@ominity/api-typescript/models/identity/user-recovery-code";
 import { useLoginActivity, useUser } from "@ominity/next/react";
-import Image from "next/image";
 import { useState, type FormEvent } from "react";
 
-import { InputMfaCode } from "@/components/auth/input-mfa-code";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const METHODS = ["totp", "email", "sms"] as const;
+import { MfaSetupDialog } from "./mfa-setup-dialog";
+
+const LABELS: Readonly<Record<string, string>> = { authenticator: "Authenticator app", email: "Email", sms: "SMS" };
+const label = (method: string) => LABELS[method] ?? method;
 
 function date(value: string | null | undefined): string {
   return value ? new Date(value).toLocaleString() : "—";
@@ -22,8 +22,7 @@ function date(value: string | null | undefined): string {
 export function AccountSecurity() {
   const profile = useUser();
   const activity = useLoginActivity({ pageSize: 10 });
-  const [setup, setSetup] = useState<UserMfaMethod | null>(null);
-  const [code, setCode] = useState("");
+  const [setupMethod, setSetupMethod] = useState<string | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<ReadonlyArray<UserRecoveryCode> | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const user = profile.user;
@@ -49,7 +48,6 @@ export function AccountSecurity() {
     }), "Profile saved.");
   };
 
-  const enabled = new Map(profile.mfaMethods.map((method) => [method.method, method]));
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -68,36 +66,20 @@ export function AccountSecurity() {
       <Card>
         <CardHeader><CardTitle>Two-factor authentication</CardTitle><CardDescription>{user.isMfaEnabled ? "On" : "Off"} for this account.</CardDescription></CardHeader>
         <CardContent className="space-y-3">
-          {METHODS.map((method) => {
-            const current = enabled.get(method);
-            return (
-              <div key={method} className="flex items-center justify-between rounded-lg border p-3 text-sm">
-                <span>
-                  <span className="font-medium uppercase">{method}</span>
-                  {current?.isEnabled && current.lastUsedAt && <span className="block text-xs text-muted-foreground">Last used {date(current.lastUsedAt)}</span>}
-                </span>
-                {current?.isEnabled
-                  ? <Button size="sm" variant="outline" disabled={profile.pending} onClick={() => { void attempt(() => profile.disableMfa(method), `${method} turned off.`); }}>Turn off</Button>
-                  : <Button size="sm" disabled={profile.pending} onClick={() => { void attempt(async () => setSetup(await profile.enableMfa(method))); }}>Set up</Button>}
-              </div>
-            );
-          })}
-
-          {setup && (
-            <div className="space-y-2 rounded-lg bg-muted/40 p-3 text-sm">
-              {setup.details?.qrCode && <Image src={setup.details.qrCode} alt="Scan with your authenticator app" width={160} height={160} unoptimized />}
-              {setup.details?.secret && <p className="font-mono text-xs">{setup.details.secret}</p>}
-              <p>Enter the code from {setup.method === "totp" ? "your authenticator app" : `the ${setup.method} we sent`} to finish.</p>
-              <InputMfaCode value={code} onChange={setCode} disabled={profile.pending} />
-              <Button size="sm" disabled={profile.pending} onClick={() => {
-                void attempt(async () => {
-                  if (!(await profile.confirmMfa(setup.method, code))) throw new Error("The code is not valid.");
-                  setSetup(null);
-                  setCode("");
-                }, "Two-factor authentication is on.");
-              }}>Confirm</Button>
+          {/* Ominity lists the methods the channel offers, each with `isEnabled` for this user. */}
+          {profile.mfaLoading && profile.mfaMethods.length === 0 && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {!profile.mfaLoading && profile.mfaMethods.length === 0 && <p className="text-sm text-muted-foreground">No two-factor methods are available yet.</p>}
+          {profile.mfaMethods.map(({ method, isEnabled, lastUsedAt }) => (
+            <div key={method} className="flex items-center justify-between rounded-lg border p-3 text-sm">
+              <span>
+                <span className="font-medium">{label(method)}</span>
+                {isEnabled && lastUsedAt && <span className="block text-xs text-muted-foreground">Last used {date(lastUsedAt)}</span>}
+              </span>
+              {isEnabled
+                ? <Button size="sm" variant="outline" disabled={profile.pending} onClick={() => { void attempt(() => profile.disableMfa(method), `${label(method)} turned off.`); }}>Turn off</Button>
+                : <Button size="sm" disabled={profile.pending} onClick={() => setSetupMethod(method)}>Set up</Button>}
             </div>
-          )}
+          ))}
 
           <Button size="sm" variant="secondary" disabled={profile.pending} onClick={() => { void attempt(async () => setRecoveryCodes(await profile.regenerateRecoveryCodes())); }}>
             New recovery codes
@@ -106,6 +88,11 @@ export function AccountSecurity() {
             <p className="font-mono text-xs">{recoveryCodes.map((entry) => entry.code).join("  ")}</p>
           )}
           {message && <p className="text-sm text-muted-foreground">{message}</p>}
+          <MfaSetupDialog
+            method={setupMethod}
+            profile={profile}
+            onClose={() => { setSetupMethod(null); setMessage(null); }}
+          />
         </CardContent>
       </Card>
 

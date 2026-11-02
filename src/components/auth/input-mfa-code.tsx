@@ -14,6 +14,7 @@ export interface InputMfaCodeProps {
   readonly onChange: (next: string) => void;
   readonly disabled?: boolean;
   readonly id?: string;
+  readonly autoFocus?: boolean;
 }
 
 function normalizeMfaCode(value: string): string {
@@ -35,6 +36,7 @@ export function InputMfaCode(props: InputMfaCodeProps) {
       inputMode="numeric"
       autoComplete="one-time-code"
       disabled={props.disabled}
+      autoFocus={props.autoFocus}
     >
       <InputOTPGroup className="gap-2 [&>[data-slot=input-otp-slot]]:rounded-md [&>[data-slot=input-otp-slot]]:border">
         <InputOTPSlot index={0} />

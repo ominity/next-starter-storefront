@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatAmount } from "@/lib/format";
@@ -65,14 +66,12 @@ function AddressFields({ id, value, countries, onChange }: {
       {field("region", "Region")}
       <div className="space-y-1">
         <Label htmlFor={`${id}-country`}>Country</Label>
-        <select
-          id={`${id}-country`}
-          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-          value={value.country}
-          onChange={(event) => onChange({ ...value, country: event.target.value })}
-        >
-          {countries.map((country) => <option key={country} value={country}>{country}</option>)}
-        </select>
+        <Select value={value.country} onValueChange={(country) => onChange({ ...value, country })}>
+          <SelectTrigger id={`${id}-country`}><SelectValue placeholder="Select a country" /></SelectTrigger>
+          <SelectContent>
+            {countries.map((country) => <SelectItem key={country} value={country}>{country}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Building2 } from "lucide-react";
 import { useCustomer } from "@ominity/next/react";
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export interface AccountSwitcherProps {
@@ -20,27 +21,28 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
 
   return (
     <div className={cn("space-y-1", className)}>
-      <label className="flex items-center gap-2 rounded-md border bg-background px-2">
-        <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-        <span className="sr-only">Active customer account</span>
-        <select
-          value={accounts.customerId ?? ""}
-          disabled={accounts.loading}
-          onChange={(event) => {
-            setError(null);
-            void accounts.switchTo(Number(event.target.value)).catch((caught: unknown) => {
-              setError(caught instanceof Error ? caught.message : "Could not switch customer account.");
-            });
-          }}
-          className="h-8 max-w-44 bg-transparent text-xs font-medium outline-none disabled:cursor-wait"
-        >
+      <Select
+        value={accounts.customerId === null ? "" : String(accounts.customerId)}
+        disabled={accounts.loading}
+        onValueChange={(next) => {
+          setError(null);
+          void accounts.switchTo(Number(next)).catch((caught: unknown) => {
+            setError(caught instanceof Error ? caught.message : "Could not switch customer account.");
+          });
+        }}
+      >
+        <SelectTrigger aria-label="Active customer account" className="h-8 w-auto max-w-52 gap-2 px-2 text-xs font-medium md:text-xs">
+          <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
           {accounts.memberships.map((membership) => (
-            <option key={membership.customerId} value={membership.customerId}>
+            <SelectItem key={membership.customerId} value={String(membership.customerId)}>
               {membership.customer?.name ?? `Account ${membership.customerId}`}
-            </option>
+            </SelectItem>
           ))}
-        </select>
-      </label>
+        </SelectContent>
+      </Select>
       {error && <p className="max-w-52 text-xs text-destructive" role="alert">{error}</p>}
     </div>
   );

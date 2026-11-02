@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export interface CustomerAccountTeamProps {
   readonly language: string;
@@ -98,28 +99,29 @@ export function CustomerAccountTeam({ language }: CustomerAccountTeamProps) {
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{member.email}</p>
                 </div>
-                <select
-                  aria-label={`Role for ${member.email}`}
-                  value={member.roleId}
+                <Select
+                  value={String(member.roleId)}
                   disabled={!canManage || accounts.isMutationPending(mutation)}
-                  onChange={(event) => {
+                  onValueChange={(next) => {
                     setMessage(null);
                     void accounts.updateMemberRole({
                       userId: member.userId,
-                      roleId: Number(event.target.value),
+                      roleId: Number(next),
                     }).catch((error: unknown) => {
                       setMessage(error instanceof Error ? error.message : "Could not change the role.");
                     });
                   }}
-                  className="h-9 rounded-md border bg-background px-3 text-sm disabled:opacity-60"
                 >
-                  {!roles.some((role) => role.id === member.roleId) && member.role && (
-                    <option value={member.roleId}>{member.role.name}</option>
-                  )}
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
-                  ))}
-                </select>
+                  <SelectTrigger aria-label={`Role for ${member.email}`} className="w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {!roles.some((role) => role.id === member.roleId) && member.role && (
+                      <SelectItem value={String(member.roleId)}>{member.role.name}</SelectItem>
+                    )}
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {canManage && (
                   <Button
                     type="button"
@@ -167,18 +169,14 @@ export function CustomerAccountTeam({ language }: CustomerAccountTeamProps) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="team-invite-role">Role</Label>
-                <select
-                  id="team-invite-role"
-                  value={roleId}
-                  onChange={(event) => setRoleId(event.target.value)}
-                  disabled={accounts.isMutationPending("invite") || roles.length === 0}
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                >
-                  <option value="">Select a role</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
-                  ))}
-                </select>
+                <Select value={roleId} onValueChange={setRoleId} disabled={accounts.isMutationPending("invite") || roles.length === 0}>
+                  <SelectTrigger id="team-invite-role"><SelectValue placeholder="Select a role" /></SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <Button type="submit" disabled={accounts.isMutationPending("invite") || roles.length === 0}>
                 {accounts.isMutationPending("invite") ? "Sending…" : "Invite"}

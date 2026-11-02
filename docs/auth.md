@@ -68,7 +68,7 @@ user; accounts are never linked by email. On failure the login page shows the `s
 `AccountSecurity` (`src/components/account/account-security.tsx`) is built on `useUser` and `useLoginActivity`:
 
 - profile changes with `profile.update({ firstName, lastName, email })`;
-- MFA per method: `enableMfa(method)` (for `totp` with the QR code and secret from `details`), `confirmMfa(method,
+- MFA per method: `enableMfa(method)` (for `authenticator` with the QR code and secret from `details`; only the methods the channel offers are listed), `confirmMfa(method,
   code)`, `disableMfa(method)`;
 - new recovery codes with `regenerateRecoveryCodes()`;
 - recent sign-ins from `useLoginActivity({ pageSize: 10 })`, page by page.
