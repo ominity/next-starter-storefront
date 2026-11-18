@@ -35,9 +35,11 @@ src/
     [[...path]]/_views/         what each kind of page renders, by domain: cms, commerce, auth, account
     api/[...ominity]/route.ts   every API route, from @ominity/next/routes
     layout.tsx, not-found.tsx, sitemap.ts
+  proxy.ts                      keeps social login results out of the address bar
   lib/
     ominity/config.ts           environment
     ominity/sdk.ts              ominity(locale): the server SDK (API key, server-only)
+    ominity/auth.ts             auth settings, server-loaded social providers, signed-in redirect
     ominity/site.ts             channel, routing, link resolver
     ominity/routes.ts           the starter's own pages and their localized paths
     ominity/pages.ts            URL → page resolution
@@ -46,7 +48,7 @@ src/
   locales/ui/{lang}.json        UI copy
   components/
     providers.tsx               one OminityProvider for auth, accounts, cart, wishlist, tracking, dev tool
-    auth/, account/, commerce/  sign-in, account portal, cart → checkout → payment
+    auth/, account/, commerce/  sign-in (password, email code, passkeys, social), account portal, cart → checkout → payment
     cms/, site/, ui/            CMS blocks, header, shadcn-style UI
 ```
 

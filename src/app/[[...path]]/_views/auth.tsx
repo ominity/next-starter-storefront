@@ -4,7 +4,9 @@ import {
   AuthMfaPage,
   AuthRegisterPage,
   AuthResetPasswordPage,
+  AuthVerifyEmailCodePage,
 } from "@/components/auth";
+import { getSocialProviders, redirectIfSignedIn } from "@/lib/ominity/auth";
 
 import type { PageViews } from "./types";
 
@@ -13,18 +15,40 @@ export const authViews = {
     title: "Login",
     async render({ paths, param }) {
       const [returnTo, socialError] = await Promise.all([param("returnTo"), param("socialError")]);
-      return <AuthLoginPage paths={paths} {...(returnTo ? { returnTo } : {})} {...(socialError ? { socialError } : {})} />;
+      await redirectIfSignedIn(paths, returnTo);
+      const socialProviders = await getSocialProviders();
+      return (
+        <AuthLoginPage
+          paths={paths}
+          socialProviders={socialProviders}
+          {...(returnTo ? { returnTo } : {})}
+          {...(socialError ? { socialError } : {})}
+        />
+      );
     },
   },
   register: {
     title: "Create account",
-    render: ({ paths }) => <AuthRegisterPage paths={paths} />,
+    async render({ paths }) {
+      await redirectIfSignedIn(paths, undefined);
+      return <AuthRegisterPage paths={paths} />;
+    },
   },
   mfa: {
     title: "Two-factor authentication",
     async render({ paths, param }) {
       const returnTo = await param("returnTo");
+      // A sign-in waiting for its second factor doesn't count as signed in, so this page stays reachable mid-login.
+      await redirectIfSignedIn(paths, returnTo);
       return <AuthMfaPage paths={paths} {...(returnTo ? { returnTo } : {})} />;
+    },
+  },
+  verify: {
+    title: "Check your email",
+    async render({ paths, param }) {
+      const returnTo = await param("returnTo");
+      await redirectIfSignedIn(paths, returnTo);
+      return <AuthVerifyEmailCodePage paths={paths} {...(returnTo ? { returnTo } : {})} />;
     },
   },
   forgotPassword: {

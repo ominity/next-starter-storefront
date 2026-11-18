@@ -81,7 +81,9 @@ The link opens the localized `invitation` page (`account/invitations/{token}`).
 `CustomerInvitationPage` inspects the token publicly (customer, role, expiry, whether registration is needed), then
 uses `signInAndAcceptInvitation` or `registerAndAcceptInvitation` from `useOminityCustomerAccounts()`. These go
 through the normal `/api/auth/login` and `/api/auth/register` routes; when the user has MFA, the page sends them to
-the MFA step, which returns to the invitation page to accept. Acceptance needs a session whose email matches the invitation.
+the MFA step, which returns to the invitation page to accept. When the account still has to confirm its email
+(`requires-verification`), the page sends them to the `verify` code page, which also returns here. Acceptance needs a
+session whose email matches the invitation.
 
 ## Removing parts
 

@@ -2,6 +2,7 @@ export * from "./login-page";
 export * from "./register-page";
 export * from "./account-page";
 export * from "./mfa-page";
+export * from "./verify-email-code-page";
 export * from "./input-password";
 export * from "./password-strength-bar";
 export * from "./input-mfa-code";

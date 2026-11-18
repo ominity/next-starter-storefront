@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@ominity/next/react";
+import { safeReturnTo, useAuth } from "@ominity/next/react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+import { authErrorMessage } from "./email-code";
 import { InputMfaCode } from "./input-mfa-code";
 import { InputRecoveryCode } from "./input-recovery-code";
 
@@ -45,7 +46,7 @@ export function AuthMfaPage({ paths, returnTo }: AuthMfaPageProps) {
   const [code, setCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const method = selected ?? methods[0] ?? RECOVERY;
-  const target = (returnTo?.startsWith("/") ? returnTo : paths.account) as Route;
+  const target = safeReturnTo(returnTo, paths.account) as Route;
 
   useEffect(() => {
     if (auth.status === "authenticated") router.replace(target);
@@ -60,7 +61,7 @@ export function AuthMfaPage({ paths, returnTo }: AuthMfaPageProps) {
       <Card className="mx-auto max-w-lg">
         <CardHeader>
           <CardTitle className="text-2xl">Two-factor authentication</CardTitle>
-          <CardDescription>Sign in with your password first.</CardDescription>
+          <CardDescription>Sign in first; this step only appears when your account has two-factor authentication.</CardDescription>
         </CardHeader>
         <CardContent>
           <Link href={paths.login as Route} className="text-sm font-medium text-primary hover:underline">Go to login</Link>
@@ -74,7 +75,8 @@ export function AuthMfaPage({ paths, returnTo }: AuthMfaPageProps) {
     try {
       await (method === RECOVERY ? auth.verifyRecoveryCode(recoveryCode(code)) : auth.verifyMfa(method, code.trim()));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Verification failed.");
+      // Ominity allows 5 wrong codes in 15 minutes (20 a day); past that it says how long to wait.
+      setMessage(authErrorMessage(error, "Verification failed."));
     }
   };
 
@@ -84,7 +86,7 @@ export function AuthMfaPage({ paths, returnTo }: AuthMfaPageProps) {
       await auth.sendMfaCode(method);
       setMessage("A code is on its way.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not send a code.");
+      setMessage(authErrorMessage(error, "Could not send a code."));
     }
   };
 

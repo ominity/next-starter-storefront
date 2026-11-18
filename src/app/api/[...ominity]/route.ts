@@ -1,5 +1,6 @@
 import { createOminityRouteHandlers } from "@ominity/next/routes";
 
+import { authConfig } from "@/lib/ominity/auth";
 import { config } from "@/lib/ominity/config";
 import { routePath } from "@/lib/ominity/routes";
 import { getChannel, getRouting, resolveRequestCountry, resolveRequestSdkLanguage } from "@/lib/ominity/site";
@@ -14,16 +15,13 @@ async function defaultLocalePath(name: "account" | "login" | "mfa"): Promise<str
  * gateway (`/api/ominity`), tracking, forms, draft mode and the dev tool.
  */
 export const { GET, POST, PATCH, PUT, DELETE } = createOminityRouteHandlers({
-  ominityBaseUrl: config.apiUrl,
-  ominityApiKey: config.apiKey,
-  authClientId: config.authClientId,
-  authClientSecret: config.authClientSecret,
-  authScope: config.authScope,
-  authSessionSecret: config.authSessionSecret,
-  siteUrl: config.siteUrl,
-  nodeEnv: config.nodeEnv,
-  debugEnabled: config.debugLogs,
+  ...authConfig,
   resolveLanguage: resolveRequestSdkLanguage,
+  /** Links in sign-in and signup code emails open the `verify` page in the visitor's language. */
+  async emailCodePath(request) {
+    const [channel, routing, language] = await Promise.all([getChannel(), getRouting(), resolveRequestSdkLanguage(request)]);
+    return routePath("verify", language ?? channel.defaultLocale, routing);
+  },
   draftToken: config.draftToken,
   devTool: config.devTool,
   auth: {
