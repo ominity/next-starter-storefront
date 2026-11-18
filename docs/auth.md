@@ -67,12 +67,11 @@ email and when a new code may be sent wait in sessionStorage (`src/components/au
 A password sign-up (`auth.register`) also ends on the code page: the account can't sign in until its email is
 confirmed.
 
-`AuthVerifyEmailCodePage` signs in with `auth.verifyEmailCode({ email, code })`. The email's link points to
-`emailCodePath` (`/auth/verify` in `authConfig`) with `#email=…&code=…`; the page reads that with `readEmailCodeLink()`
-and fills the code in, but the user confirms it, because mail scanners open links. Without a locale prefix the path
-resolves to the default locale and redirects to its canonical URL; browsers keep the fragment. If you localize the
-`verify` path, keep the default locale's path in `emailCodePath`. The wait before a new code (a minute, growing to
-fifteen) shows in words through `useResendCountdown`.
+`AuthVerifyEmailCodePage` signs in with `auth.verifyEmailCode({ email, code })`. The email's link points to the
+`verify` page in the visitor's language (`emailCodePath` in `src/app/api/[...ominity]/route.ts`, built per request with
+`routePath`) with `#email=…&code=…`; the page reads that with `readEmailCodeLink()` and fills the code in, but the user
+confirms it, because mail scanners open links. The wait before a new code (a minute, growing to fifteen) shows in
+words through `useResendCountdown`.
 
 Needs in Ominity: the `user_signup_code` and `user_login_code` email templates and the `email_code` grant on the auth
 client.

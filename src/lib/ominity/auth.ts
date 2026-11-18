@@ -21,12 +21,6 @@ export const authConfig = {
   siteUrl: config.siteUrl,
   nodeEnv: config.nodeEnv,
   debugEnabled: config.debugLogs,
-  /**
-   * Where the links in sign-in and signup code emails point. Without a locale prefix the page resolves to the
-   * default locale and redirects to its canonical path; browsers keep the `#email=…&code=…` fragment across that
-   * redirect. Keep it equal to the `verify` path in `src/locales/routes/*.json`.
-   */
-  emailCodePath: "/auth/verify",
 } satisfies OminityAuthRouteHandlerConfig;
 
 /** Throws when Ominity can't be reached, so a failure is not cached. */

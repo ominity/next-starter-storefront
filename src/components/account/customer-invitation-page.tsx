@@ -87,9 +87,9 @@ export function CustomerInvitationPage({ token, paths }: CustomerInvitationPageP
         router.replace(`${paths.mfa}?returnTo=${encodeURIComponent(pathname)}` as Route);
         return;
       }
-      if (result.status === "requires-sign-in" && mode === "register") {
-        // The new account confirms its email first: Ominity emailed a code. After it, the user comes back here.
-        rememberPendingEmailCode({ email: invitation.email, resendAvailableAt: null, returnTo: pathname });
+      if (result.status === "requires-verification") {
+        // The account confirms its email first: Ominity emailed a code. After it, the user comes back here to accept.
+        rememberPendingEmailCode({ email: result.email, resendAvailableAt: result.resendAvailableAt, returnTo: pathname });
         router.push(paths.verify as Route);
         return;
       }

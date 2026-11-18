@@ -17,6 +17,11 @@ async function defaultLocalePath(name: "account" | "login" | "mfa"): Promise<str
 export const { GET, POST, PATCH, PUT, DELETE } = createOminityRouteHandlers({
   ...authConfig,
   resolveLanguage: resolveRequestSdkLanguage,
+  /** Links in sign-in and signup code emails open the `verify` page in the visitor's language. */
+  async emailCodePath(request) {
+    const [channel, routing, language] = await Promise.all([getChannel(), getRouting(), resolveRequestSdkLanguage(request)]);
+    return routePath("verify", language ?? channel.defaultLocale, routing);
+  },
   draftToken: config.draftToken,
   devTool: config.devTool,
   auth: {
