@@ -22,6 +22,8 @@ Use this file as the first stop for future coding-agent work. The local source s
 - `src/components/providers.tsx`: the single `OminityProvider`.
 - `src/lib/ominity/config.ts`: runtime config parser. The source of truth for env names/defaults.
 - `src/lib/ominity/sdk.ts`: `ominity(locale)`, the cached server SDK with the API key (`server-only`).
+- `src/lib/ominity/auth.ts`: `authConfig` (shared by the API route and the auth pages), `getSocialProviders`, `redirectIfSignedIn` (`server-only`).
+- `src/proxy.ts`: removes the social login result parameters from the URL (`handleOminitySocialLoginRedirect`).
 - `src/lib/ominity/site.ts`: `createOminitySiteSupport`, CMS client, channel context and routing, `cmsLinkResolver`, `linkTo`, request language/country resolvers.
 - `src/lib/ominity/routes.ts`: the starter's own pages and their localized paths (`routePath`, `routePaths`, `matchRoute`, `productPath`).
 - `src/lib/ominity/pages.ts`: `resolvePage`, URL → page resolution.
@@ -252,7 +254,7 @@ Every value they return is an SDK type; there are no local wrapper types. `CUSTO
 
 ## Auth
 
-Pages (`src/components/auth`): login, register, MFA, forgot/reset password, account. A password sign-in of a user with MFA returns `mfa_required` and continues to the `mfa` page; social sign-ins of MFA users are redirected there by the route. Until the second factor is verified, the session is pending and the server treats the browser as signed out. `returnTo` is passed along and only followed when it starts with `/`.
+Pages (`src/components/auth`): login (password, a code by email, passkeys, social), register (password or a code by email), MFA, `verify` (the emailed 6-digit code), forgot/reset password, account (with passkeys and MFA settings). A password sign-in of a user with MFA returns `mfa_required` and continues to the `mfa` page; social sign-ins of MFA users are redirected there by the route. Until the second factor is verified, the session is pending and the server treats the browser as signed out. A password sign-up, or a sign-in of an account that hasn't confirmed its email, returns `verification_required` and continues to `verify`. `returnTo` is passed along and only followed through `safeReturnTo`. Signed-in visitors are sent away from the auth pages on the server (`redirectIfSignedIn`). Turning off an MFA method and new recovery codes need proof (`MfaProofDialog`). Passkeys need the site's origin among the channel's domains in Ominity. See `docs/auth.md`.
 
 `OMINITY_AUTH_SESSION_SECRET` must be a strong random value. The browser never receives the OAuth client secret, API key, access token, or refresh token. Auth requests are deliberately not shown in the dev tool request log.
 

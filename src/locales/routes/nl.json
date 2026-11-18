@@ -2,6 +2,7 @@
   "login": "auth/login",
   "register": "auth/register",
   "mfa": "auth/mfa",
+  "verify": "auth/verify",
   "forgotPassword": "auth/forgot-password",
   "resetPassword": "auth/reset-password",
   "account": "account",

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+import { MfaProofDialog } from "./mfa-proof-dialog";
 import { MfaSetupDialog } from "./mfa-setup-dialog";
 
 const LABELS: Readonly<Record<string, string>> = { authenticator: "Authenticator app", email: "Email", sms: "SMS" };
@@ -23,6 +24,8 @@ export function AccountSecurity() {
   const profile = useUser();
   const activity = useLoginActivity({ pageSize: 10 });
   const [setupMethod, setSetupMethod] = useState<string | null>(null);
+  /** The method being turned off, or "recovery" for new recovery codes, while the proof dialog is open. */
+  const [proofFor, setProofFor] = useState<string | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<ReadonlyArray<UserRecoveryCode> | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const user = profile.user;
@@ -36,6 +39,14 @@ export function AccountSecurity() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "That did not work.");
     }
+  };
+
+  const enabledMethods = profile.mfaMethods.filter((item) => item.isEnabled).map((item) => item.method);
+
+  /** New codes replace the current ones. With two-factor on, Ominity asks for proof first. */
+  const newRecoveryCodes = () => {
+    if (user.isMfaEnabled) setProofFor("recovery");
+    else void attempt(async () => setRecoveryCodes(await profile.regenerateRecoveryCodes()));
   };
 
   const saveProfile = (event: FormEvent<HTMLFormElement>) => {
@@ -76,18 +87,47 @@ export function AccountSecurity() {
                 {isEnabled && lastUsedAt && <span className="block text-xs text-muted-foreground">Last used {date(lastUsedAt)}</span>}
               </span>
               {isEnabled
-                ? <Button size="sm" variant="outline" disabled={profile.pending} onClick={() => { void attempt(() => profile.disableMfa(method), `${label(method)} turned off.`); }}>Turn off</Button>
+                ? <Button size="sm" variant="outline" disabled={profile.pending} onClick={() => { setMessage(null); setProofFor(method); }}>Turn off</Button>
                 : <Button size="sm" disabled={profile.pending} onClick={() => setSetupMethod(method)}>Set up</Button>}
             </div>
           ))}
 
-          <Button size="sm" variant="secondary" disabled={profile.pending} onClick={() => { void attempt(async () => setRecoveryCodes(await profile.regenerateRecoveryCodes())); }}>
+          <Button size="sm" variant="secondary" disabled={profile.pending} onClick={newRecoveryCodes}>
             New recovery codes
           </Button>
           {recoveryCodes && (
-            <p className="font-mono text-xs">{recoveryCodes.map((entry) => entry.code).join("  ")}</p>
+            <div className="space-y-1 rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Save these now: they are shown only once and each works one time.</p>
+              <p className="font-mono text-xs">{recoveryCodes.map((entry) => entry.code).join("  ")}</p>
+            </div>
           )}
           {message && <p className="text-sm text-muted-foreground">{message}</p>}
+          {proofFor === "recovery" && (
+            <MfaProofDialog
+              title="New recovery codes"
+              description="Confirm it's you with a code from one of your methods. The new codes replace your current ones."
+              methods={enabledMethods}
+              confirmLabel="Create codes"
+              profile={profile}
+              onConfirm={async (proof) => { setRecoveryCodes(await profile.regenerateRecoveryCodes(proof)); }}
+              onClose={() => setProofFor(null)}
+            />
+          )}
+          {proofFor && proofFor !== "recovery" && (
+            <MfaProofDialog
+              key={proofFor}
+              title={`Turn off ${label(proofFor)}`}
+              description="Confirm with a current code of this method, or one of your recovery codes."
+              methods={[proofFor]}
+              confirmLabel="Turn off"
+              profile={profile}
+              onConfirm={async (proof) => {
+                await profile.disableMfa(proofFor, "recoveryCode" in proof ? { recoveryCode: proof.recoveryCode } : { code: proof.code });
+                setMessage(`${label(proofFor)} turned off.`);
+              }}
+              onClose={() => setProofFor(null)}
+            />
+          )}
           <MfaSetupDialog
             method={setupMethod}
             profile={profile}

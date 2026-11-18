@@ -1,20 +1,20 @@
 "use client";
 
 import { useAuth, type OminitySocialProvider } from "@ominity/next/react";
-import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 
-export function SocialLoginOptions() {
+/**
+ * Other ways to sign in under an "Or continue with" divider: `leading` (the passkey button) and the channel's social
+ * providers. The page loads the providers on the server (`getSocialProviders` in `src/lib/ominity/auth.ts`), so they
+ * are there in the first paint.
+ */
+export function SocialLoginOptions({ providers, leading }: {
+  readonly providers: ReadonlyArray<OminitySocialProvider>;
+  readonly leading?: ReactNode;
+}) {
   const auth = useAuth();
-  const [providers, setProviders] = useState<ReadonlyArray<OminitySocialProvider>>([]);
-  const { listSocialProviders } = auth;
 
-  useEffect(() => {
-    void listSocialProviders().then(setProviders, () => setProviders([]));
-    // Load once; the provider list does not change while the page is open.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (providers.length === 0) return null;
+  if (providers.length === 0 && !leading) return null;
 
   return (
     <div className="space-y-3">
@@ -24,6 +24,7 @@ export function SocialLoginOptions() {
         <span className="h-px flex-1 bg-border" />
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
+        {leading}
         {providers.map((provider) => (
           <a
             key={provider.id}

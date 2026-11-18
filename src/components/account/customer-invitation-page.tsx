@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useOminityCustomerAccounts } from "@ominity/next/customer-accounts/react";
 
 import { useAuth } from "@ominity/next/react";
+import { rememberPendingEmailCode } from "@/components/auth/email-code";
 import { InputPassword } from "@/components/auth/input-password";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ export interface CustomerInvitationPageProps {
     readonly login: string;
     readonly register: string;
     readonly mfa: string;
+    readonly verify: string;
   };
 }
 
@@ -83,6 +85,12 @@ export function CustomerInvitationPage({ token, paths }: CustomerInvitationPageP
 
       if (result.status === "requires-mfa") {
         router.replace(`${paths.mfa}?returnTo=${encodeURIComponent(pathname)}` as Route);
+        return;
+      }
+      if (result.status === "requires-sign-in" && mode === "register") {
+        // The new account confirms its email first: Ominity emailed a code. After it, the user comes back here.
+        rememberPendingEmailCode({ email: invitation.email, resendAvailableAt: null, returnTo: pathname });
+        router.push(paths.verify as Route);
         return;
       }
       if (result.status === "accepted") finish();

@@ -5,7 +5,7 @@ import type { Route } from "next";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AccountSecurity, CustomerAccountDashboard } from "@/components/account";
+import { AccountPasskeys, AccountSecurity, CustomerAccountDashboard } from "@/components/account";
 
 import { useAuth } from "@ominity/next/react";
 
@@ -13,6 +13,7 @@ export interface AuthAccountPageProps {
   readonly language: string;
   readonly paths: {
     readonly login: string;
+    readonly account: string;
     readonly register: string;
     readonly mfa: string;
     readonly cart: string;
@@ -76,6 +77,8 @@ export function AuthAccountPage(props: AuthAccountPageProps) {
       <CustomerAccountDashboard language={props.language} />
 
       <AccountSecurity />
+
+      <AccountPasskeys paths={props.paths} />
     </div>
   );
 }

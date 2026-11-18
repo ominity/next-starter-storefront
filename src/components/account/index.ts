@@ -1,4 +1,6 @@
 export * from "./account-security";
+export * from "./account-passkeys";
+export * from "./mfa-proof-dialog";
 export * from "./account-switcher";
 export * from "./customer-account-dashboard";
 export * from "./customer-account-profile";
